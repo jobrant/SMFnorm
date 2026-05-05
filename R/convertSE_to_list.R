@@ -81,6 +81,8 @@ convertSE_to_list <- function(rse, groups = NULL, verbose = TRUE) {
 
     # Optional: Calculate mc (methylated counts) if you need the original full set
     dt[, mc := cov * rate]
+    
+    .create_uid(dt)
 
     # Return as a data.table
     return(data.table::as.data.table(dt))

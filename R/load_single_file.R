@@ -28,7 +28,7 @@ load_single_file <- function(file_path, use_cpp = TRUE) {
     df <- readMethylationFile(file_path)
     df <- data.table::as.data.table(df)
     df[, rate := ifelse(cov > 0, mc/cov, 0)]
-    df[, uniqueID := paste(chr, pos, site, sep="_")]
+    .create_uid(df)  # fast numeric key
   } else {
     df <- .load_single_file_r(file_path)
   }

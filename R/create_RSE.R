@@ -22,42 +22,43 @@
 #'
 #' @export
 create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE) {
-
-  # Validate input list of list structure, all elements should be named
+  
   if (!is.list(lol) || is.null(names(lol))) {
     stop("Input 'lol' must be a named list.")
   }
   if (!all(sapply(lol, function(x) is.list(x) && !is.null(names(x))))) {
     stop("All elements in 'lol' must be named lists.")
   }
-
-  # --- PART 0: Subset the list to extract the groups specified
+  
   if(!is.null(groups)){
     if (verbose) message("Subsetting groups...")
     lol <- lol[groups]
   }
-
-  # --- PART 1: Metadata Extraction ---
-  # We use the first sample of the first Group to define our genomic 'spine'
-  key_cols <- c("chr", "pos", "strand", "site", "uniqueID")
-
+  
+  # ── PART 1: Metadata Extraction ──
+  key_cols <- c("chr", "pos", "strand", "site")
+  
   if (verbose) message("Extracting master metadata and rowRanges...")
   first_s <- names(lol)[1]
-  if (is.null(first_s)) stop("Input list 'lol' must be named.")
-
   first_r <- names(lol[[first_s]])[1]
-  if (is.null(first_r)) stop("Sample lists must be named.")
-
-  required_cols <- c("chr", "pos", "strand", "site", "uniqueID", "cov", "rate")
+  
+  required_cols <- c("chr", "pos", "strand", "site", "cov", "rate")
   first_df <- lol[[first_s]][[first_r]]
   if (!all(required_cols %in% names(first_df))) {
     stop("Missing required columns: ", paste(setdiff(required_cols, names(first_df)), collapse = ", "))
   }
-
-  # Extract unique genomic sites
-  meta <- as.data.table(lol[[first_s]][[first_r]])[, ..key_cols]
-  setkey(meta, uniqueID)
-
+  
+  meta <- as.data.table(first_df)[, ..key_cols]
+  
+  # Create uid if not present, for fast alignment
+  if (!"uid" %in% names(meta)) {
+    .create_uid(meta)
+  }
+  setkey(meta, uid)
+  
+  # Generate string uniqueID for GRanges metadata and matrix rownames
+  .create_string_uid(meta)
+  
   # Construct RowRanges
   row_ranges <- GenomicRanges::GRanges(
     seqnames = as.character(meta$chr),
@@ -66,69 +67,66 @@ create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE
     site     = meta$site,
     uniqueID = meta$uniqueID
   )
-
-  # --- PART 2: Flattening and Matrix Pre-allocation ---
+  
+  # ── PART 2: Flattening and Matrix Pre-allocation ──
   if (verbose) message("Flattening structure and pre-allocating matrices...")
-
-  # Flatten nested list: names usually become "Group.Sample"
+  
   flat_reps <- unlist(lol, recursive = FALSE)
   rep_names <- names(flat_reps)
-
+  
   num_rows <- nrow(meta)
   num_reps <- length(flat_reps)
-
-  # Pre-allocate numeric matrices (NA_real_ is memory efficient and supports decimals)
+  
   cov_matrix  <- matrix(NA_real_, nrow = num_rows, ncol = num_reps)
   rate_matrix <- matrix(NA_real_, nrow = num_rows, ncol = num_reps)
-
-  # --- PART 3: Alignment Loop ---
+  
+  # ── PART 3: Alignment Loop (using numeric uid) ──
   if (verbose) message("Aligning samples to the column metadata...")
-
-  # Store names to avoid index out of bounds when we NULL-out elements
+  
   iteration_names <- names(flat_reps)
-
+  
   for (i in seq_along(iteration_names)) {
     curr_rep_name <- iteration_names[i]
     if (verbose) message("   -> Processing: ", curr_rep_name)
-
+    
     dt <- as.data.table(flat_reps[[curr_rep_name]])
-    setkey(dt, uniqueID)
-
-    # Right-join against 'meta' ensures rows match RowRanges even if sites are missing
-    aligned_dt <- dt[meta[, .(uniqueID)]]
-
+    
+    # Ensure uid exists
+    if (!"uid" %in% names(dt)) {
+      .create_uid(dt)
+    }
+    setkey(dt, uid)
+    
+    # Fast numeric key join
+    aligned_dt <- dt[meta[, .(uid)]]
+    
     cov_matrix[, i]  <- as.numeric(aligned_dt$cov)
     rate_matrix[, i] <- as.numeric(aligned_dt$rate)
-
-    # Memory cleanup: remove the large data frame once copied to the matrix
+    
     flat_reps[[curr_rep_name]] <- NULL
   }
-
-  # --- PART 4: Column Metadata ---
+  
+  # ── PART 4: Column Metadata ──
   if (verbose) message("Building colData...")
-
-  # Standardize naming convention (Group_Sample)
+  
   clean_names <- gsub("\\.", "_", rep_names)
   colnames(cov_matrix) <- colnames(rate_matrix) <- clean_names
-  rownames(cov_matrix) <- rownames(rate_matrix) <- meta$uniqueID
-
-  # Split names into Group and Sample factors
+  rownames(cov_matrix) <- rownames(rate_matrix) <- meta$uniqueID  # string for rownames
+  
   name_split <- stringr::str_split(clean_names, pattern = "_", n = 2, simplify = TRUE)
-
+  
   col_metadata <- data.frame(
     group      = as.factor(name_split[, 1]),
-    sample = name_split[, 2],
-    row.names   = clean_names,
+    sample     = name_split[, 2],
+    row.names  = clean_names,
     stringsAsFactors = FALSE
   )
-
-  # --- PART 5: Assembly ---
+  
+  # ── PART 5: Assembly ──
   if (verbose) message("Assembling RangedSummarizedExperiment...")
-
-
-
+  
   rse <- SummarizedExperiment::SummarizedExperiment(
-    assays    = SimpleList(
+    assays    = S4Vectors::SimpleList(
       coverage = cov_matrix,
       rate     = rate_matrix
     ),
@@ -136,7 +134,7 @@ create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE
     colData   = col_metadata,
     metadata  = list(experiment = exp_metadata)
   )
-
+  
   return(rse)
 }
 
