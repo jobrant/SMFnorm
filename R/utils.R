@@ -412,10 +412,13 @@
       # Preserve structure while normalizing to average
       centered <- current_rates - mean(current_rates)
       new_rates <- avg_quant_rate + alpha * centered
+      
+      # Clamp rates to [0, 1] and ensure mc does not exceed cov
+      new_rates <- pmin(1, pmax(0, new_rates))
 
       # Update methylation counts and rates
       dt[sites_in_quantile, `:=`(
-        mc = cov * new_rates,
+        mc = pmin(cov, as.integer(round(cov * new_rates))),
         rate = new_rates
       )]
 
