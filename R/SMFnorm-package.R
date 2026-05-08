@@ -2,10 +2,8 @@
 "_PACKAGE"
 
 ## Shared imports used across the package
-#' @importFrom data.table data.table as.data.table is.data.table fread
-#'   fwrite setnames setDT setkey setkeyv haskey copy rbindlist := setDTthreads
-#' @importFrom stats median quantile aggregate na.omit prcomp, cmdscale, dist, 
-#' var, complete.cases
+#' @importFrom data.table data.table as.data.table is.data.table fread fwrite setnames setDT setkey setkeyv haskey copy rbindlist := setDTthreads
+#' @importFrom stats median quantile aggregate na.omit prcomp cmdscale dist var complete.cases
 #' @importFrom utils head setTxtProgressBar txtProgressBar combn 
 #' @importFrom methods is new
 #' @importFrom GenomicRanges GRanges
@@ -21,8 +19,10 @@
 #' @importFrom grid grid.newpage grid.text gpar
 #' @importFrom reshape2 dcast
 #' @importFrom patchwork wrap_plots
-#' @importFrom ggplot2 ggplot scale_fill_viridis_c aes geom_point geom_abline
-#' geom_density geom_hex geom_bar facet_wrap labs theme theme_minimal element_text
+#' @importFrom ggplot2 ggplot scale_fill_viridis_c aes geom_point geom_abline geom_density geom_hex geom_bar facet_wrap labs theme theme_minimal element_text
 #' @importFrom Rcpp evalCpp
 #' 
+#' @keywords internal
+#' @useDynLib SMFnorm, .registration = TRUE
+"_PACKAGE"
 NULL

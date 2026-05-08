@@ -16,9 +16,11 @@ create_bedgraph(
 }
 \arguments{
 \item{data}{Input data, can be either:
-1. A list of lists containing normalized samples
-2. A single data frame containing one sample
-3. A character string specifying path to input file}
+\enumerate{
+\item A list of lists containing normalized samples
+\item A single data frame containing one sample
+\item A character string specifying path to input file
+}}
 
 \item{type}{Character string for type of value to include in bedGraph.
 Should be one of "cov" or "meth" (for coverage bedGraph or methylation rate bedGraph, respectively.)}

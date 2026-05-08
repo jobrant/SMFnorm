@@ -2,18 +2,18 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 createBedgraphCpp <- function(sample_df, type, out_path, group_name = NULL, sample_name = NULL) {
-    .Call(`_MAPitNorm_createBedgraphCpp`, sample_df, type, out_path, group_name, sample_name)
+    .Call(`_SMFnorm_createBedgraphCpp`, sample_df, type, out_path, group_name, sample_name)
 }
 
 readMethylationFile <- function(filename) {
-    .Call(`_MAPitNorm_readMethylationFile`, filename)
+    .Call(`_SMFnorm_readMethylationFile`, filename)
 }
 
 readMethylationFiles <- function(filenames) {
-    .Call(`_MAPitNorm_readMethylationFiles`, filenames)
+    .Call(`_SMFnorm_readMethylationFiles`, filenames)
 }
 
 testCpp <- function() {
-    .Call(`_MAPitNorm_testCpp`)
+    .Call(`_SMFnorm_testCpp`)
 }
 

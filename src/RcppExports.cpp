@@ -12,7 +12,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // createBedgraphCpp
 String createBedgraphCpp(DataFrame sample_df, std::string type, std::string out_path, Nullable<String> group_name, Nullable<String> sample_name);
-RcppExport SEXP _MAPitNorm_createBedgraphCpp(SEXP sample_dfSEXP, SEXP typeSEXP, SEXP out_pathSEXP, SEXP group_nameSEXP, SEXP sample_nameSEXP) {
+RcppExport SEXP _SMFnorm_createBedgraphCpp(SEXP sample_dfSEXP, SEXP typeSEXP, SEXP out_pathSEXP, SEXP group_nameSEXP, SEXP sample_nameSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -27,7 +27,7 @@ END_RCPP
 }
 // readMethylationFile
 DataFrame readMethylationFile(std::string filename);
-RcppExport SEXP _MAPitNorm_readMethylationFile(SEXP filenameSEXP) {
+RcppExport SEXP _SMFnorm_readMethylationFile(SEXP filenameSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -38,7 +38,7 @@ END_RCPP
 }
 // readMethylationFiles
 List readMethylationFiles(CharacterVector filenames);
-RcppExport SEXP _MAPitNorm_readMethylationFiles(SEXP filenamesSEXP) {
+RcppExport SEXP _SMFnorm_readMethylationFiles(SEXP filenamesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -49,7 +49,7 @@ END_RCPP
 }
 // testCpp
 std::string testCpp();
-RcppExport SEXP _MAPitNorm_testCpp() {
+RcppExport SEXP _SMFnorm_testCpp() {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -59,14 +59,14 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_MAPitNorm_createBedgraphCpp", (DL_FUNC) &_MAPitNorm_createBedgraphCpp, 5},
-    {"_MAPitNorm_readMethylationFile", (DL_FUNC) &_MAPitNorm_readMethylationFile, 1},
-    {"_MAPitNorm_readMethylationFiles", (DL_FUNC) &_MAPitNorm_readMethylationFiles, 1},
-    {"_MAPitNorm_testCpp", (DL_FUNC) &_MAPitNorm_testCpp, 0},
+    {"_SMFnorm_createBedgraphCpp", (DL_FUNC) &_SMFnorm_createBedgraphCpp, 5},
+    {"_SMFnorm_readMethylationFile", (DL_FUNC) &_SMFnorm_readMethylationFile, 1},
+    {"_SMFnorm_readMethylationFiles", (DL_FUNC) &_SMFnorm_readMethylationFiles, 1},
+    {"_SMFnorm_testCpp", (DL_FUNC) &_SMFnorm_testCpp, 0},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_MAPitNorm(DllInfo *dll) {
+RcppExport void R_init_SMFnorm(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

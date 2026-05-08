@@ -19,7 +19,7 @@
 #'    single data.table if single_file is provided.
 #'
 #' @export
-#' @useDynLib MAPitNorm, .registration = TRUE
+
 load_data <- function(dir_path, sample_sheet, type = NULL, groups = NULL,
                       cores = 1, use_cpp = TRUE, single_file = NULL) {
 
