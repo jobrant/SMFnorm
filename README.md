@@ -1,10 +1,10 @@
-# MAPitNorm
-Normalization of accessibility methylation data from genome-wide, single molecule, MAPit sequence data
+# SMFnorm
+Normalization of accessibility methylation data from genome-wide, single molecule, sequence data such as MAPit, NOMe-seq, Fiber-seq, etc..
 
-# MAPitNorm: Acessibility Methylation Data Normalization Package
+# SMFnorm: Single Molecule Footprinting Data Normalization Package
 
 ## Overview
-MAPitNorm is a specialized R package designed for normalizing methylation data from genome-wide MAPit experiments, such as MAPit-CpGiant or MAPit-RRBS. It implements a sophisticated two-step normalization process that addresses both technical variation between replicates and systematic differences between experimental groups while preserving biological signals.
+SMFnorm is a specialized R package designed for normalizing methylation data from genome-wide footprinting, such as MAPit-CpGiant or MAPit-RRBS, NOMe-seq or Fiber-seq. It implements a sophisticated quantile-bin shrinkage normalization process that addresses technical variation between replicates while preserving biological signals.
 
 ## Core Functions
 
