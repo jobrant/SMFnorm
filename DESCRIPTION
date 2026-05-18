@@ -1,7 +1,7 @@
 Type: Package
 Package: SMFnorm
 Title: What the Package Does (Title Case)
-Version: 0.2.0-alpha
+Version: 0.2.0
 Author: Jason Orr Brant, PhD (jobrant@ufl.edu)
 Maintainer: jobrant@ufl.edu
 Description: SMFnorm is a specialized R package designed for normalizing methylation data from genome-wide footprinting, 
