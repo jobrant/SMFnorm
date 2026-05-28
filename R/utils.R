@@ -323,14 +323,27 @@
                                              diagnostics = TRUE) {
 
   if(diagnostics) cat("Calculating average rates...\n")
+  
+  # Debugging
+  rate_list <- lapply(sample_list, function(df) df$rate)
+  lens <- lengths(rate_list)
+  message("DEBUG .normalize_methylation_within_set row counts: ", 
+          paste(lens, collapse = ", "))
+  if (length(unique(lens)) > 1) {
+    stop(sprintf(
+      "Samples have unequal row counts before cbind: %s",
+      paste(names(lens), lens, sep = "=", collapse = ", ")
+    ))
+  }
+  avg_rates <- rowMeans(do.call(cbind, rate_list))
 
   # Calculate average methylation rates
-  rate_mat <- do.call(cbind, lapply(sample_list, `[[`, "rate"))
-  avg_rates <- rowMeans(rate_mat)
-  
-  if (!is.matrix(rate_mat) || ncol(rate_mat) != length(sample_list)) {
-    stop("Samples have inconsistent row counts — check find_shared_sites was applied")
-  }
+  # rate_mat <- do.call(cbind, lapply(sample_list, `[[`, "rate"))
+  # avg_rates <- rowMeans(rate_mat)
+  # 
+  # if (!is.matrix(rate_mat) || ncol(rate_mat) != length(sample_list)) {
+  #   stop("Samples have inconsistent row counts — check find_shared_sites was applied")
+  # }
 
   # Dynamic quantile calculation
   n_sites <- length(avg_rates)
