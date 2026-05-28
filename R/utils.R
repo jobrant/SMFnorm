@@ -300,13 +300,11 @@
 #' @keywords internal
 .normalize_group <- function(replicates, sf) {
   purrr::map2(replicates, sf, function(df, s) {
-    if(is.na(s)) stop("Scaling factor is NA")
+    if (is.na(s)) stop("Scaling factor is NA")
     dt <- data.table::copy(df)
-    data.table::setDT(dt)
-    data.table::setDT(dt)[, c("cov", "mc", "rate") := list(cov/s,
-                                                           mc/s,
-                                                           mc/cov
-    )]
+    data.table::set(dt, j = "cov",  value = dt$cov / s)
+    data.table::set(dt, j = "mc",   value = dt$mc  / s)
+    data.table::set(dt, j = "rate", value = ifelse(dt$cov > 0, dt$mc / dt$cov, 0))
     return(dt)
   })
 }
