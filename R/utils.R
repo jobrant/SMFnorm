@@ -327,7 +327,12 @@
   if(diagnostics) cat("Calculating average rates...\n")
 
   # Calculate average methylation rates
-  avg_rates <- rowMeans(do.call(cbind, lapply(sample_list, function(df) df$rate)))
+  rate_mat <- do.call(cbind, lapply(sample_list, `[[`, "rate"))
+  avg_rates <- rowMeans(rate_mat)
+  
+  if (!is.matrix(rate_mat) || ncol(rate_mat) != length(sample_list)) {
+    stop("Samples have inconsistent row counts — check find_shared_sites was applied")
+  }
 
   # Dynamic quantile calculation
   n_sites <- length(avg_rates)
