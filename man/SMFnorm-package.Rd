@@ -5,8 +5,8 @@
 \alias{SMFnorm-package}
 \title{SMFnorm: What the Package Does (Title Case)}
 \description{
-More about what it does (maybe more than one line) Use four spaces when indenting paragraphs within the Description.
+SMFnorm is a specialized R package designed for normalizing methylation data from genome-wide footprinting, such as MAPit-CpGiant or MAPit-RRBS, NOMe-seq or Fiber-seq. It implements a sophisticated quantile-bin shrinkage normalization process that addresses technical variation between replicates while preserving biological signals.
 
-More about what it does (maybe more than one line) Use four spaces when indenting paragraphs within the Description.
+SMFnorm is a specialized R package designed for normalizing methylation data from genome-wide footprinting, such as MAPit-CpGiant or MAPit-RRBS, NOMe-seq or Fiber-seq. It implements a sophisticated quantile-bin shrinkage normalization process that addresses technical variation between replicates while preserving biological signals.
 }
 \keyword{internal}
