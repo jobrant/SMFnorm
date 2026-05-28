@@ -68,18 +68,34 @@ normalize_methylation_data <- function(data_list,
                                        diagnostics = FALSE) {
 
   group_names <- extract_group_names(data_list, diagnostics)
+  
+  # Diagnostic: row counts at entry
+  for (grp in names(data_list)) {
+    rc <- sapply(data_list[[grp]], nrow)
+    message(sprintf("DIAG entry - group %s: %s", grp,
+                    paste(names(rc), rc, sep="=", collapse=", ")))
+  }
 
   # Step 0: Filter by minimum coverage if specified
   if (min_coverage > 0) {
     data_list <- lapply(data_list, function(group) {
       lapply(group, function(df) {
-        df[df$cov >= min_coverage, ]
+        cov_vals <- df$cov
+        message(sprintf(
+          "DIAG pre-filter: %d rows, cov range [%.3f, %.3f], mean=%.3f, n_pass (>=%.0f): %d",
+          nrow(df), min(cov_vals), max(cov_vals), mean(cov_vals),
+          min_coverage, sum(cov_vals >= min_coverage)
+        ))
+        df[cov_vals >= min_coverage, ]
       })
     })
-
-    if (diagnostics) {
-      cat("Filtered sites with coverage <", min_coverage, "\n")
-    }
+  }
+  
+  # Diagnostic: row counts after Step 0
+  for (grp in names(data_list)) {
+    rc <- sapply(data_list[[grp]], nrow)
+    message(sprintf("DIAG post-filter - group %s: %s", grp,
+                    paste(names(rc), rc, sep="=", collapse=", ")))
   }
 
   # Step 1: Coverage normalization
@@ -88,6 +104,13 @@ normalize_methylation_data <- function(data_list,
                                     group_names = group_names,
                                     between_groups = coverage_between_groups,
                                     diagnostics = diagnostics)
+  }
+  
+  # Diagnostic: row counts after Step 1
+  for (grp in names(data_list)) {
+    rc <- sapply(data_list[[grp]], nrow)
+    message(sprintf("DIAG post-coverage-norm - group %s: %s", grp,
+                    paste(names(rc), rc, sep="=", collapse=", ")))
   }
 
   # Step 2: Rate normalization
