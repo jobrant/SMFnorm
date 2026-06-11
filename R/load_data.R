@@ -15,13 +15,16 @@
 #'   Default is TRUE. Will fall back to R implementation if C++ is not available.
 #' @param single_file Optional path to a single methylation file to load directly
 #'   When provided, the sample_sheet parameter is ignored.
+#' @param min_coverage Integer Minimum coverage threshold. Sites with coverage
+#'   below this value are excluded during loading. Default is 0 (no filtering).
 #' @return A list of data.tables containing processed methylation data, or a
 #'    single data.table if single_file is provided.
 #'
 #' @export
 
 load_data <- function(dir_path, sample_sheet, type = NULL, groups = NULL,
-                      cores = 1, use_cpp = TRUE, single_file = NULL) {
+                      cores = 1, use_cpp = TRUE, single_file = NULL, 
+                      min_coverage = 0L) {
 
   # Handle single file case
   if (!is.null(single_file)) {
@@ -36,7 +39,8 @@ load_data <- function(dir_path, sample_sheet, type = NULL, groups = NULL,
       file_path <- file.path(dir_path, single_file)
     }
 
-    return(load_single_file(file_path, use_cpp = use_cpp))
+    return(load_single_file(file_path, use_cpp = use_cpp, 
+                            min_coverage = min_coverage))
   }
 
   # If we reach here, we're loading multiple files
@@ -88,9 +92,11 @@ load_data <- function(dir_path, sample_sheet, type = NULL, groups = NULL,
 
   # Load data using appropriate implementation
   if (use_cpp_impl) {
-    all_samples <- .load_data_cpp(files.list, cores)
+    all_samples <- .load_data_cpp(files.list, cores, 
+                                  min_coverage = min_coverage)
   } else {
-    all_samples <- .load_data_r(files.list, cores)
+    all_samples <- .load_data_r(files.list, cores, 
+                                min_coverage = min_coverage)
   }
 
   # Post-process and attach metadata

@@ -26,24 +26,26 @@ BEGIN_RCPP
 END_RCPP
 }
 // readMethylationFile
-DataFrame readMethylationFile(std::string filename);
-RcppExport SEXP _SMFnorm_readMethylationFile(SEXP filenameSEXP) {
+DataFrame readMethylationFile(std::string filename, int min_coverage);
+RcppExport SEXP _SMFnorm_readMethylationFile(SEXP filenameSEXP, SEXP min_coverageSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< std::string >::type filename(filenameSEXP);
-    rcpp_result_gen = Rcpp::wrap(readMethylationFile(filename));
+    Rcpp::traits::input_parameter< int >::type min_coverage(min_coverageSEXP);
+    rcpp_result_gen = Rcpp::wrap(readMethylationFile(filename, min_coverage));
     return rcpp_result_gen;
 END_RCPP
 }
 // readMethylationFiles
-List readMethylationFiles(CharacterVector filenames);
-RcppExport SEXP _SMFnorm_readMethylationFiles(SEXP filenamesSEXP) {
+List readMethylationFiles(CharacterVector filenames, int min_coverage);
+RcppExport SEXP _SMFnorm_readMethylationFiles(SEXP filenamesSEXP, SEXP min_coverageSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< CharacterVector >::type filenames(filenamesSEXP);
-    rcpp_result_gen = Rcpp::wrap(readMethylationFiles(filenames));
+    Rcpp::traits::input_parameter< int >::type min_coverage(min_coverageSEXP);
+    rcpp_result_gen = Rcpp::wrap(readMethylationFiles(filenames, min_coverage));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -60,8 +62,8 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SMFnorm_createBedgraphCpp", (DL_FUNC) &_SMFnorm_createBedgraphCpp, 5},
-    {"_SMFnorm_readMethylationFile", (DL_FUNC) &_SMFnorm_readMethylationFile, 1},
-    {"_SMFnorm_readMethylationFiles", (DL_FUNC) &_SMFnorm_readMethylationFiles, 1},
+    {"_SMFnorm_readMethylationFile", (DL_FUNC) &_SMFnorm_readMethylationFile, 2},
+    {"_SMFnorm_readMethylationFiles", (DL_FUNC) &_SMFnorm_readMethylationFiles, 2},
     {"_SMFnorm_testCpp", (DL_FUNC) &_SMFnorm_testCpp, 0},
     {NULL, NULL, 0}
 };

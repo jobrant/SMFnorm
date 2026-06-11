@@ -11,7 +11,8 @@ load_data(
   groups = NULL,
   cores = 1,
   use_cpp = TRUE,
-  single_file = NULL
+  single_file = NULL,
+  min_coverage = 0L
 )
 }
 \arguments{
@@ -34,6 +35,9 @@ Default is TRUE. Will fall back to R implementation if C++ is not available.}
 
 \item{single_file}{Optional path to a single methylation file to load directly
 When provided, the sample_sheet parameter is ignored.}
+
+\item{min_coverage}{Integer Minimum coverage threshold. Sites with coverage
+below this value are excluded during loading. Default is 0 (no filtering).}
 }
 \value{
 A list of data.tables containing processed methylation data, or a

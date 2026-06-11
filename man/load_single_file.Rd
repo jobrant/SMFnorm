@@ -4,13 +4,16 @@
 \alias{load_single_file}
 \title{Load a single methylation data file}
 \usage{
-load_single_file(file_path, use_cpp = TRUE)
+load_single_file(file_path, use_cpp = TRUE, min_coverage = 0L)
 }
 \arguments{
 \item{file_path}{Path to the methylation data file.}
 
 \item{use_cpp}{Logical, whether to use the C++ implementation for faster loading.
 Default is TRUE. Will fall back to R implementation if C++ is not available.}
+
+\item{min_coverage}{Integer. Minimum coverage threshold. Sites with coverage
+below this value are excluded during loading. Default is 0 (no filtering).}
 }
 \value{
 A data.table containing the methylation data.

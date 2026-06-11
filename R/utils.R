@@ -117,9 +117,9 @@
 }
 
 # Internal function to load using C++ implementation
-.load_data_cpp <- function(files.list, cores) {
+.load_data_cpp <- function(files.list, cores, min_coverage = 0L) {
   # Call the C++ function
-  raw_data <- readMethylationFiles(files.list)
+  raw_data <- readMethylationFiles(files.list, min_coverage = min_coverage)
   names(raw_data) <- names(files.list)
 
   # Convert to data.tables and add calculated columns
@@ -135,15 +135,16 @@
 }
 
 # Internal function as fallback using pure R
-.load_data_r <- function(files.list, cores) {
-  # Import helper functions using ::
-  # This ensures the package works even if these packages aren't loaded
+.load_data_r <- function(files.list, cores, min_coverage = 0L) {
+  
   if (cores > 1 && requireNamespace("parallel", quietly = TRUE)) {
     # Use parallel processing
-    all_samples <- .load_data_parallel(files.list, cores)
+    all_samples <- .load_data_parallel(files.list, cores, 
+                                       min_coverage = min_coverage)
   } else {
     # Use sequential processing with progress bar
-    all_samples <- .load_data_sequential(files.list)
+    all_samples <- .load_data_sequential(files.list, 
+                                         min_coverage = min_coverage)
   }
 
   return(all_samples)
@@ -153,7 +154,7 @@
 #' @return data.table of methylation data
 #' @keywords internal
 #' @noRd
-.load_single_file_r <- function(file) {
+.load_single_file_r <- function(file, min_coverage = 0L) {
   tryCatch({
     # Use base R to read the gzipped file
     con <- gzfile(file, "r")
@@ -198,6 +199,11 @@
     # Safely calculate rate
     df[, rate := ifelse(cov > 0, mc/cov, 0)]
     .create_uid(df)
+    
+    # Apply minimum coverage filter
+    if (min_coverage > 0L) {
+      df <- df[cov >= min_coverage]
+    }
 
     return(df)
   }, error = function(e) {
@@ -211,7 +217,7 @@
 #' @return data.table of methylation data
 #' @keywords internal
 #' @noRd
-.load_data_sequential <- function(files.list) {
+.load_data_sequential <- function(files.list, min_coverage = 0L) {
   # Create progress bar
   pb <- progress::progress_bar$new(
     format = "  Loading [:bar] :percent in :elapsed",
@@ -221,7 +227,7 @@
 
   all_samples <- lapply(files.list, function(file) {
     pb$tick()
-    .load_single_file_r(file)
+    .load_single_file_r(file, min_coverage = min_coverage)
   })
 
   names(all_samples) <- names(files.list)
@@ -232,7 +238,7 @@
 #' @return data.table of methylation data
 #' @keywords internal
 #' @noRd
-.load_data_parallel <- function(files.list, cores) {
+.load_data_parallel <- function(files.list, cores, min_coverage = 0L) {
   all_samples <- NULL
 
   if (cores > 1) {
@@ -250,7 +256,10 @@
         NULL
       })
 
-      all_samples <- parallel::parLapply(cl, files.list, .load_single_file_r)
+      all_samples <- parallel::parLapply(
+        cl, files.list, 
+        function(f) .load_single_file_r(f, min_coverage = min_coverage)
+        )
       names(all_samples) <- names(files.list)
 
     }, error = function(e) {
@@ -262,7 +271,7 @@
 
   # If parallel processing failed, fall back to sequential
   if (is.null(all_samples)) {
-    all_samples <- .load_data_sequential(files.list)
+    all_samples <- .load_data_sequential(files.list, min_coverage = min_coverage)
   }
 
   return(all_samples)

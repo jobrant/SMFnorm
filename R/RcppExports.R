@@ -5,12 +5,12 @@ createBedgraphCpp <- function(sample_df, type, out_path, group_name = NULL, samp
     .Call(`_SMFnorm_createBedgraphCpp`, sample_df, type, out_path, group_name, sample_name)
 }
 
-readMethylationFile <- function(filename) {
-    .Call(`_SMFnorm_readMethylationFile`, filename)
+readMethylationFile <- function(filename, min_coverage = 0L) {
+    .Call(`_SMFnorm_readMethylationFile`, filename, min_coverage)
 }
 
-readMethylationFiles <- function(filenames) {
-    .Call(`_SMFnorm_readMethylationFiles`, filenames)
+readMethylationFiles <- function(filenames, min_coverage = 0L) {
+    .Call(`_SMFnorm_readMethylationFiles`, filenames, min_coverage)
 }
 
 testCpp <- function() {

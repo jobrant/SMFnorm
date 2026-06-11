@@ -1,5 +1,6 @@
 #include <Rcpp.h>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <zlib.h>
 using namespace Rcpp;
@@ -13,7 +14,7 @@ std::vector<std::string> readGzippedLines(const char* filename) {
     Rcpp::stop("Could not open file: %s", filename);
   }
   
-  char buffer[1024];
+  char buffer[4096];
   while (gzgets(file, buffer, sizeof(buffer)) != NULL) {
     lines.push_back(std::string(buffer));
   }
@@ -23,19 +24,24 @@ std::vector<std::string> readGzippedLines(const char* filename) {
 }
 
 // [[Rcpp::export]]
-DataFrame readMethylationFile(std::string filename) {
+DataFrame readMethylationFile(std::string filename, int min_coverage = 0) {
   Rcout << "Reading file: " << filename << "\n";
   // Read all lines from the gzipped file
   std::vector<std::string> lines = readGzippedLines(filename.c_str());
-  
-  // Preallocate vectors for data
+
+  // Use std::vector with push_back so we only store rows that pass the filter.
+  std::vector<std::string> chr_vec, strand_vec, site_vec;
+  std::vector<int>         pos_vec, mc_vec, cov_vec;
+
+  // Reserve capacity based on total lines to avoid repeated reallocation.
+  // Most rows will pass when min_coverage is 0; this is a safe upper bound.
   int n_lines = lines.size();
-  CharacterVector chr(n_lines);
-  IntegerVector pos(n_lines);
-  CharacterVector strand(n_lines);
-  CharacterVector site(n_lines);
-  IntegerVector mc(n_lines);
-  IntegerVector cov(n_lines);
+  chr_vec.reserve(n_lines);
+  pos_vec.reserve(n_lines);
+  strand_vec.reserve(n_lines);
+  site_vec.reserve(n_lines);
+  mc_vec.reserve(n_lines);
+  cov_vec.reserve(n_lines);
   
   // Parse each line
   for (int i = 0; i < n_lines; i++) {
@@ -52,24 +58,28 @@ DataFrame readMethylationFile(std::string filename) {
         (iss >> mc_val) && iss.ignore() &&
         (iss >> cov_val)) {
         
-      // Store in vectors
-      chr[i] = chr_val;
-      pos[i] = pos_val;
-      strand[i] = strand_val;
-      site[i] = site_val;
-      mc[i] = mc_val;
-      cov[i] = cov_val;
+      // Apply minimum coverage filter before storing
+      if (cov_val < min_coverage) continue;
+        chr_vec.push_back(chr_val);
+        pos_vec.push_back(pos_val);
+        strand_vec.push_back(strand_val);
+        site_vec.push_back(site_val);
+        mc_vec.push_back(mc_val);
+        cov_vec.push_back(cov_val);
+      }
     }
+    if (min_coverage > 0) {
+    Rcout << "  Retained " << chr_vec.size() << " / " << n_lines
+          << " sites (cov >= " << min_coverage << ")\n";
   }
   
-  // Create and return data frame
   DataFrame df = DataFrame::create(
-    _["chr"] = chr,
-    _["pos"] = pos,
-    _["strand"] = strand,
-    _["site"] = site,
-    _["mc"] = mc,
-    _["cov"] = cov
+    _["chr"]    = chr_vec,
+    _["pos"]    = pos_vec,
+    _["strand"] = strand_vec,
+    _["site"]   = site_vec,
+    _["mc"]     = mc_vec,
+    _["cov"]    = cov_vec
   );
   
   return df;
@@ -77,7 +87,7 @@ DataFrame readMethylationFile(std::string filename) {
 
 
 // [[Rcpp::export]]
-List readMethylationFiles(CharacterVector filenames) {
+List readMethylationFiles(CharacterVector filenames, int min_coverage = 0) {
   Rcout << "Entering readMethylationFiles with " << filenames.size() << " files\n";
   int n_files = filenames.size();
   List results(n_files);
@@ -86,7 +96,7 @@ List readMethylationFiles(CharacterVector filenames) {
     std::string filename = as<std::string>(filenames[i]);
     Rcout << "Processing file: " << filename << "\n";
     Rcpp::checkUserInterrupt(); // Allow user to cancel
-    results[i] = readMethylationFile(filename);
+    results[i] = readMethylationFile(filename, min_coverage);
   }
   
   Rcout << "Exiting readMethylationFiles\n";
