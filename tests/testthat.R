@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(MAPitNorm)
+library(SMFnorm)
 
-test_check("MAPitNorm")
+test_check("SMFnorm")

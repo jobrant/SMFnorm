@@ -200,7 +200,7 @@ create_bigwig <- function(
   
   builtin_file <- system.file("extdata",
                               paste0(genome, ".chrom.sizes"),
-                              package = "MAPitNorm")
+                              package = "SMFnorm")
   if (builtin_file == "" || !file.exists(builtin_file)) {
     stop("Built-in chromosome sizes file not found for genome: ", genome)
   }

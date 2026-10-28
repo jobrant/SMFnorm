@@ -37,7 +37,7 @@ summarize_meth <- function(meth_data, show_site_types = TRUE) {
   sample_metadata <- attr(meth_data, "sample_metadata")
 
   # --- Header ---
-  cat("MAPitNorm Methylation Data Summary\n")
+  cat("SMFnorm Methylation Data Summary\n")
   cat(strrep("=", 40), "\n")
 
   if (is_nested) {

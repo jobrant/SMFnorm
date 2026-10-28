@@ -40,7 +40,7 @@ create_bedgraph <- function(data,
 
   # Determine C++ implementation availability
   has_rcpp <- requireNamespace("Rcpp", quietly = TRUE) &&
-    is.function(get("createBedgraphCpp", envir = asNamespace("MAPitNorm")))
+    is.function(get("createBedgraphCpp", envir = asNamespace("SMFnorm")))
 
   use_cpp_impl <- use_cpp && has_rcpp
 
