@@ -63,6 +63,14 @@
 #'   by rate, and will remove both. Use \code{between_groups = FALSE} when such a
 #'   difference is expected between conditions.
 #'
+#'   Within-group normalization on its own is not a neutral fallback. It
+#'   removes each group's replicate spread but leaves the groups' levels as
+#'   they are, so any efficiency difference between groups is tested against
+#'   less noise and looks more significant than in the unnormalized data. With
+#'   \code{within_groups = TRUE} and \code{between_groups = FALSE}, a warning
+#'   is issued when the groups' mean rates differ by more than 5\% of their
+#'   average.
+#'
 #' @return List of lists containing normalized methylation data
 #'
 #' @export
@@ -103,6 +111,15 @@ normalize_methylation_rates <- function(data_list,
   if (!all(sapply(data_list, is.list))) stop("data_list must be a list of lists")
 
   result <- data_list
+
+  # Within-group normalization alone removes each group's replicate spread but
+  # keeps the groups' levels, so any efficiency difference between groups is
+  # tested against less noise and looks MORE significant than in the raw data.
+  # On a real same-condition null (M1 split 2 vs 2) this turned 22 false
+  # positives into 907. Warn when the groups' levels clearly differ.
+  if (within_groups && !between_groups && length(result) > 1) {
+    .warn_unequal_group_rates(result)
+  }
 
   # Step 1: Within-group normalization
   if(within_groups) {

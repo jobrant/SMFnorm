@@ -164,3 +164,18 @@ make_test_split_data <- function(n_reps_per_group = 2,
 
   return(result)
 }
+
+
+#' Evaluate an expression, muffling only SMFnorm's within-group-only warning
+#'
+#' Several tests deliberately run within-group-only normalization on the
+#' unequal groups make_test_split_data() produces, which correctly triggers
+#' the "only within-group rate normalization" warning. Those tests check other
+#' things; this silences that one warning and lets any other through.
+quiet_within_only <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl("only within-group rate normalization", conditionMessage(w))) {
+      invokeRestart("muffleWarning")
+    }
+  })
+}

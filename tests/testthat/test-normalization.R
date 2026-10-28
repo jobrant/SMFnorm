@@ -68,7 +68,7 @@ test_that("normalize_methylation_data clamps rates to [0, 1]", {
     n_reps_per_group = 3, n_sites = 500, seed = 42
   )
 
-  normalized <- normalize_methylation_data(
+  normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
     do_coverage_norm = TRUE,
     normalize_rates = TRUE,
@@ -77,7 +77,7 @@ test_that("normalize_methylation_data clamps rates to [0, 1]", {
     within_alpha = 0.3,
     min_coverage = 1,
     diagnostics = FALSE
-  )
+  ))
 
   for (g in names(normalized)) {
     for (r in names(normalized[[g]])) {
@@ -131,7 +131,7 @@ test_that("rate normalization reduces within-group variance", {
     mean(apply(rates, 1, var))
   })
 
-  normalized <- normalize_methylation_data(
+  normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
     do_coverage_norm = FALSE,
     normalize_rates = TRUE,
@@ -140,7 +140,7 @@ test_that("rate normalization reduces within-group variance", {
     within_alpha = 0.3,
     min_coverage = 1,
     diagnostics = FALSE
-  )
+  ))
 
   # Measure variance after
   var_after <- sapply(normalized, function(g) {
@@ -161,7 +161,7 @@ test_that("alpha = 0 collapses all rates to quantile mean", {
     n_reps_per_group = 3, n_sites = 200, seed = 42
   )
 
-  normalized <- normalize_methylation_data(
+  normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
     do_coverage_norm = FALSE,
     normalize_rates = TRUE,
@@ -170,7 +170,7 @@ test_that("alpha = 0 collapses all rates to quantile mean", {
     within_alpha = 0.0,
     min_coverage = 1,
     diagnostics = FALSE
-  )
+  ))
 
   # With alpha = 0, all samples within a group should have identical rates
   for (g in names(normalized)) {
@@ -192,7 +192,7 @@ test_that("alpha = 1 preserves original rate structure", {
     lapply(g, function(dt) dt$rate)
   })
 
-  normalized <- normalize_methylation_data(
+  normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
     do_coverage_norm = FALSE,
     normalize_rates = TRUE,
@@ -201,7 +201,7 @@ test_that("alpha = 1 preserves original rate structure", {
     within_alpha = 1.0,
     min_coverage = 1,
     diagnostics = FALSE
-  )
+  ))
 
   # With alpha = 1, sample-specific deviation is fully preserved
   # Rates should be shifted (mean adjusted) but the relative differences
@@ -396,4 +396,61 @@ test_that("between-group step at alpha = 1 removes a global group shift", {
   after <- abs(diff(gm(normalized)))
 
   expect_lt(after, 0.1 * before)
+})
+
+
+# ── Within-group-only normalization with unequal group levels ────────────────
+#
+# Within-group normalization keeps each group's level but removes replicate
+# spread, so an efficiency difference between groups looks MORE significant
+# than in the raw data (M1 real null: 22 -> 907 false positives). A warning
+# flags this when the between-group step is off.
+
+.groups_with_gap <- function(gap) {
+  split_data <- make_test_split_data(
+    n_reps_per_group = 3, n_sites = 500,
+    group_names = c("A", "B"), seed = 42
+  )
+  # make_test_split_data() gives the groups different mean rates, so first
+  # rescale B to A's level, then impose the requested relative gap.
+  gm <- function(g) mean(sapply(g, function(dt) mean(dt$rate)))
+  scale <- gm(split_data$A) / gm(split_data$B) * (1 - gap)
+  for (r in names(split_data$B)) {
+    split_data$B[[r]][, rate := pmin(1, rate * scale)]
+    split_data$B[[r]][, mc := as.integer(round(cov * rate))]
+  }
+  split_data
+}
+
+.norm_quiet <- function(d, rbg) {
+  normalize_methylation_data(
+    d, do_coverage_norm = FALSE, normalize_rates = TRUE,
+    rate_within_groups = TRUE, rate_between_groups = rbg,
+    min_coverage = 1, diagnostics = FALSE
+  )
+}
+
+test_that("within-only normalization warns when group levels differ", {
+  expect_warning(.norm_quiet(.groups_with_gap(0.3), rbg = FALSE),
+                 "only within-group rate normalization")
+})
+
+test_that("no warning when the between-group step is on", {
+  expect_no_warning(.norm_quiet(.groups_with_gap(0.3), rbg = TRUE))
+})
+
+test_that("no warning when group levels match", {
+  expect_no_warning(.norm_quiet(.groups_with_gap(0), rbg = FALSE))
+})
+
+test_that("within-only normalization keeps the group gap and shrinks spread", {
+  d <- .groups_with_gap(0.3)
+  gm <- function(x) sapply(x, function(g) mean(sapply(g, function(dt) mean(dt$rate))))
+  sp <- function(x) mean(sapply(x, function(g) {
+    mean(apply(do.call(cbind, lapply(g, `[[`, "rate")), 1, stats::sd))
+  }))
+  after <- suppressWarnings(.norm_quiet(d, rbg = FALSE))
+
+  expect_equal(abs(diff(gm(after))), abs(diff(gm(d))), tolerance = 0.05)
+  expect_lte(sp(after), sp(d))
 })

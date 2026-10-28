@@ -318,6 +318,45 @@
   })
 }
 
+#' Warn when within-group-only normalization meets unequal group levels
+#'
+#' Called by \code{\link{normalize_methylation_rates}} when the within-group
+#' step runs without the between-group step. Within-group normalization keeps
+#' each group's level but removes its replicate spread, so a difference between
+#' group levels (for example a labeling-efficiency difference) is tested
+#' against less noise and looks more significant than in the raw data.
+#'
+#' @param data_list Named list of groups, each a list of sample data frames
+#'   with a \code{rate} column.
+#' @param tolerance Relative difference between the highest and lowest group
+#'   mean rate, as a fraction of their average, above which to warn
+#'   (default 0.05).
+#' @return Invisibly, the named vector of group mean rates.
+#' @keywords internal
+.warn_unequal_group_rates <- function(data_list, tolerance = 0.05) {
+  group_means <- vapply(data_list, function(group) {
+    mean(vapply(group, function(df) mean(df$rate, na.rm = TRUE), numeric(1)))
+  }, numeric(1))
+
+  spread <- (max(group_means) - min(group_means)) / mean(group_means)
+  if (is.finite(spread) && spread > tolerance) {
+    warning(sprintf(paste0(
+      "Group mean methylation rates differ by %.0f%% (%s), but only ",
+      "within-group rate normalization is being applied. Within-group ",
+      "normalization removes replicate spread and keeps this difference, so ",
+      "it will look more significant in downstream tests than in the raw ",
+      "data. If the difference is technical (e.g. labeling efficiency), set ",
+      "rate_between_groups = TRUE (between_groups in ",
+      "normalize_methylation_rates()). Keep it FALSE only if the groups are ",
+      "expected to differ genome-wide."),
+      100 * spread,
+      paste(sprintf("%s = %.3f", names(group_means), group_means),
+            collapse = ", ")),
+      call. = FALSE)
+  }
+  invisible(group_means)
+}
+
 #' Internal function to normalize methylation rates within a set of samples
 #'
 #' Within each quantile bin of mean rate, sample s's rate at site i becomes

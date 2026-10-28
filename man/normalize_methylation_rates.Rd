@@ -92,4 +92,12 @@ rate stratum, which is what a global efficiency difference looks like. It
 cannot tell that from a genuine genome-wide biological difference stratified
 by rate, and will remove both. Use \code{between_groups = FALSE} when such a
 difference is expected between conditions.
+
+Within-group normalization on its own is not a neutral fallback. It
+removes each group's replicate spread but leaves the groups' levels as
+they are, so any efficiency difference between groups is tested against
+less noise and looks more significant than in the unnormalized data. With
+\code{within_groups = TRUE} and \code{between_groups = FALSE}, a warning
+is issued when the groups' mean rates differ by more than 5\\% of their
+average.
 }
