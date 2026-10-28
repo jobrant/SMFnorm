@@ -289,3 +289,111 @@ test_that("between-group normalization reduces group-level differences", {
   expect_lt(diff_after, diff_before,
             label = "Between-group difference reduced")
 })
+
+
+# ── What alpha does ──────────────────────────────────────────────────────────
+#
+# Within each rate bin, .normalize_methylation_within_set() sets
+#   new = mbar + alpha * (x - m_s)
+# where m_s is the sample's own bin mean and mbar the across-sample bin mean.
+# Replacing m_s by mbar IS the normalization and is applied in full at any
+# alpha; alpha only scales site-level deviations. alpha = 1 is therefore not
+# the identity. These tests pin that down: an earlier reading ("alpha = 1
+# leaves rates unchanged", "higher between_alpha preserves more of the group
+# difference") led to defaults that shrank noise and inflated false positives.
+
+.alpha_test_set <- function(effs = c(1.0, 0.85, 0.7), n = 4000, seed = 7) {
+  set.seed(seed)
+  p <- stats::runif(n, 0.25, 0.75)          # away from 0/1 so clipping is moot
+  setNames(lapply(seq_along(effs), function(i) {
+    cov <- rep(200L, n)
+    rate <- p * effs[i] + stats::rnorm(n, 0, 0.01)
+    data.table(cov = cov, rate = rate, mc = as.integer(round(cov * rate)))
+  }), paste0("S", seq_along(effs)))
+}
+
+.norm_rates <- function(set, alpha) {
+  out <- .normalize_methylation_within_set(set, alpha = alpha,
+                                           sites_per_quantile = 200,
+                                           diagnostics = FALSE)
+  do.call(cbind, lapply(out, `[[`, "rate"))
+}
+
+
+test_that("defaults apply no shrinkage (alpha = 1)", {
+  expect_identical(formals(normalize_methylation_data)$within_alpha, 1)
+  expect_identical(formals(normalize_methylation_data)$between_alpha, 1)
+  expect_identical(formals(normalize_methylation_rates)$within_alpha, 1)
+  expect_identical(formals(normalize_methylation_rates)$between_alpha, 1)
+})
+
+
+test_that("alpha = 1 is not the identity: it removes per-sample efficiency", {
+  set <- .alpha_test_set()
+  before <- vapply(set, function(d) mean(d$rate), numeric(1))
+  after  <- colMeans(.norm_rates(set, alpha = 1))
+
+  # Samples start ~30% apart in mean rate and end essentially equal.
+  expect_gt(diff(range(before)) / mean(before), 0.25)
+  expect_lt(diff(range(after)) / mean(after), 0.01)
+})
+
+
+test_that("the efficiency correction does not depend on alpha", {
+  set <- .alpha_test_set()
+  for (a in c(1, 0.5, 0.3)) {
+    after <- colMeans(.norm_rates(set, alpha = a))
+    expect_lt(diff(range(after)) / mean(after), 0.01,
+              label = paste("sample means aligned at alpha =", a))
+  }
+})
+
+
+test_that("alpha only scales site-level deviations from the bin mean", {
+  set <- .alpha_test_set()
+  r1  <- .norm_rates(set, alpha = 1)
+  r05 <- .norm_rates(set, alpha = 0.5)
+
+  # new_a = mbar + a * (x - m_s), so 2 * new_0.5 - new_1 = mbar: identical
+  # across samples at every site.
+  mbar <- 2 * r05 - r1
+  expect_lt(max(apply(mbar, 1, function(v) diff(range(v)))), 1e-9)
+
+  # And deviations around mbar at alpha = 0.5 are exactly half those at 1.
+  expect_equal(r05 - mbar, 0.5 * (r1 - mbar), tolerance = 1e-9)
+})
+
+
+test_that("alpha < 1 shrinks replicate variation; alpha = 1 does not", {
+  set <- .alpha_test_set(effs = c(1, 1, 1))     # no efficiency difference
+  raw <- do.call(cbind, lapply(set, `[[`, "rate"))
+  sd_of <- function(m) mean(apply(m, 1, stats::sd))
+
+  expect_equal(sd_of(.norm_rates(set, alpha = 1)), sd_of(raw), tolerance = 0.02)
+  expect_equal(sd_of(.norm_rates(set, alpha = 0.5)), 0.5 * sd_of(raw),
+               tolerance = 0.02)
+})
+
+
+test_that("between-group step at alpha = 1 removes a global group shift", {
+  split_data <- make_test_split_data(
+    n_reps_per_group = 3, n_sites = 500,
+    group_names = c("High", "Low"), seed = 42
+  )
+  for (r in names(split_data$Low)) {           # group-wide efficiency loss
+    split_data$Low[[r]][, rate := rate * 0.7]
+    split_data$Low[[r]][, mc := as.integer(round(cov * rate))]
+  }
+  gm <- function(d) sapply(d, function(g) mean(sapply(g, function(dt) mean(dt$rate))))
+  before <- abs(diff(gm(split_data)))
+
+  normalized <- normalize_methylation_data(
+    split_data, do_coverage_norm = FALSE, normalize_rates = TRUE,
+    rate_within_groups = TRUE, rate_between_groups = TRUE,
+    within_alpha = 1, between_alpha = 1, min_coverage = 1,
+    diagnostics = FALSE
+  )
+  after <- abs(diff(gm(normalized)))
+
+  expect_lt(after, 0.1 * before)
+})

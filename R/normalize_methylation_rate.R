@@ -8,8 +8,12 @@
 #'   will be extracted from the metadata attached to data_list.
 #' @param within_groups Logical indicating whether to normalize within groups (default = TRUE)
 #' @param between_groups Logical indicating whether to normalize between groups (default = TRUE)
-#' @param within_alpha Numeric between 0 and 1 controlling structure preservation within groups (default = 0.3)
-#' @param between_alpha Numeric between 0 and 1 controlling structure preservation between groups (default = 0.5)
+#' @param within_alpha Numeric between 0 and 1. Shrinkage of site-level
+#'   deviations in the within-group step (default = 1, no shrinkage). It does
+#'   not control how much efficiency correction is applied; see Details.
+#' @param between_alpha Numeric between 0 and 1. Shrinkage of site-level
+#'   deviations in the between-group step (default = 1, no shrinkage). It does
+#'   not control how much of the group difference is removed; see Details.
 #' @param sites_per_quantile Target number of sites per quantile (default = 1000).
 #'        For large datasets (>100k sites), this provides a good balance between
 #'        normalization granularity and statistical power.
@@ -17,10 +21,47 @@
 #' @param diagnostics Logical indicating whether to print diagnostic information
 #'
 #' @details This function performs a two-step normalization:
-#'          1. Within-group normalization to handle technical variation between replicates
-#'          2. Between-group normalization to adjust for global efficiency differences
-#'          while preserving biological differences. The higher between_alpha preserves
-#'          more of the biological differences between groups.
+#'   \enumerate{
+#'     \item Within-group: the replicates of each group are normalized to one
+#'       another, removing per-replicate labeling-efficiency differences.
+#'     \item Between-group (if \code{between_groups = TRUE}): all samples of all
+#'       groups are normalized together, removing global efficiency differences
+#'       between groups.
+#'   }
+#'
+#'   Each step bins sites into equal-count quantiles of their mean rate across
+#'   the samples in the set. Within bin \eqn{b}, the rate \eqn{x_{s,i}} of
+#'   sample \eqn{s} at site \eqn{i} becomes
+#'   \deqn{x'_{s,i} = \bar{m}_b + \alpha (x_{s,i} - m_{s,b})}
+#'   where \eqn{m_{s,b}} is sample \eqn{s}'s own mean over the bin's sites and
+#'   \eqn{\bar{m}_b} is the average of those means across samples. Results are
+#'   clipped to [0, 1].
+#'
+#'   The two means do different jobs:
+#'   \itemize{
+#'     \item Replacing \eqn{m_{s,b}} by \eqn{\bar{m}_b} is the normalization. It
+#'       shifts each sample, bin by bin, to the common level, and it is applied
+#'       in full at every value of alpha. A local difference such as a DMR
+#'       survives because its sites are a negligible fraction of any bin.
+#'     \item \eqn{\alpha} only scales each site's deviation from its sample's
+#'       bin mean. At \eqn{\alpha = 1} those deviations are kept exactly:
+#'       \eqn{x' = x + (\bar{m}_b - m_{s,b})}, a per-sample, per-bin shift. This
+#'       is not the identity: every sample is still normalized. At
+#'       \eqn{\alpha = 0} every sample's sites collapse to the bin's common level.
+#'   }
+#'
+#'   Within a bin of similar rates, the deviations are mostly sampling noise,
+#'   so \eqn{\alpha < 1} shrinks noise and makes replicates look more alike
+#'   than they are. Downstream tests then overstate precision and call more
+#'   false positives; on a real same-condition null (replicates split 2 vs 2),
+#'   \code{within_alpha = 0.5} turned 0-4 false-positive DMRs into hundreds.
+#'   Values below 1 are therefore not recommended for differential analysis.
+#'
+#'   The between-group step removes any difference shared by most sites in a
+#'   rate stratum, which is what a global efficiency difference looks like. It
+#'   cannot tell that from a genuine genome-wide biological difference stratified
+#'   by rate, and will remove both. Use \code{between_groups = FALSE} when such a
+#'   difference is expected between conditions.
 #'
 #' @return List of lists containing normalized methylation data
 #'
@@ -29,8 +70,8 @@ normalize_methylation_rates <- function(data_list,
                                         group_names = NULL,
                                         within_groups = TRUE,
                                         between_groups = TRUE,
-                                        within_alpha = 0.3,
-                                        between_alpha = 0.5,
+                                        within_alpha = 1,
+                                        between_alpha = 1,
                                         sites_per_quantile = 1000,
                                         max_quantiles = 50,
                                         diagnostics = TRUE) {
@@ -85,10 +126,11 @@ normalize_methylation_rates <- function(data_list,
     # Flatten data for between-group normalization
     all_samples <- unlist(result, recursive = FALSE)
 
-    # Perform gentler between-group normalization
+    # The per-bin shift to the common level is applied in full regardless of
+    # between_alpha; between_alpha only scales site-level deviations.
     normalized_data <- .normalize_methylation_within_set(
       all_samples,
-      alpha = between_alpha,  # Higher alpha to preserve more group differences
+      alpha = between_alpha,
       sites_per_quantile = sites_per_quantile * 2,  # Fewer quantiles for between-group
       max_quantiles = max_quantiles,
       diagnostics = diagnostics

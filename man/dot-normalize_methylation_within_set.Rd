@@ -6,7 +6,7 @@
 \usage{
 .normalize_methylation_within_set(
   sample_list,
-  alpha = 0.3,
+  alpha = 1,
   sites_per_quantile = 1000,
   max_quantiles = 50,
   diagnostics = TRUE
@@ -15,7 +15,8 @@
 \arguments{
 \item{sample_list}{List of replicate data frames}
 
-\item{alpha}{Numeric between 0 and 1 controlling structure preservation (default = 0.3)}
+\item{alpha}{Numeric between 0 and 1. Shrinkage of site-level deviations
+within each bin (default = 1, no shrinkage)}
 
 \item{sites_per_quantile}{Target number of sites per quantile (default = 1000)}
 
@@ -24,6 +25,10 @@
 \item{diagnostics}{Logical indicating whether to print diagnostic information}
 }
 \description{
-Internal function to normalize methylation rates within a set of samples
+Within each quantile bin of mean rate, sample s's rate at site i becomes
+\code{avg_quant_rate + alpha * (x - mean(x over the bin's sites))}: the
+sample's own bin mean is replaced by the across-sample bin mean (the
+normalization, applied in full at any alpha), and alpha scales the site-level
+deviations. See \code{\link{normalize_methylation_rates}}.
 }
 \keyword{internal}

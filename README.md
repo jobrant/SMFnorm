@@ -4,7 +4,7 @@ Normalization of accessibility methylation data from genome-wide, single molecul
 # SMFnorm: Single Molecule Footprinting Data Normalization Package
 
 ## Overview
-SMFnorm is a specialized R package designed for normalizing methylation data from genome-wide footprinting, such as MAPit-CpGiant or MAPit-RRBS, NOMe-seq or Fiber-seq. It implements a sophisticated quantile-bin shrinkage normalization process that addresses technical variation between replicates while preserving biological signals.
+SMFnorm is a specialized R package designed for normalizing methylation data from genome-wide footprinting, such as MAPit-CpGiant or MAPit-RRBS, NOMe-seq or Fiber-seq. It implements a quantile-bin normalization that removes differences in enzyme labeling efficiency between samples while preserving local biological signals such as differentially accessible regions.
 
 ## Core Functions
 
@@ -69,14 +69,32 @@ single_data <- load_single_file(
   - Preserves relative coverage patterns
 
 #### 2. Methylation Rate Normalization (`normalize_methylation_rates`)
-- Implements advanced quantile-based normalization with structure preservation
-- Key features:
-  - Dynamic quantile binning based on dataset size
-  - Structure preservation using alpha parameter (default = 0.3)
-  - Two-step process:
-    - Within-group normalization (technical replicates)
-    - Optional between-group normalization (experimental conditions)
-  - Preserves biological differences while reducing technical variation
+- Quantile-bin normalization of labeling-efficiency differences
+- Two steps:
+  - Within-group: replicates of each group are normalized to one another
+  - Between-group (optional): all samples are normalized together, removing
+    global efficiency differences between conditions
+- Sites are binned by mean rate (dynamic number of equal-count bins). Within a
+  bin, sample *s*'s rate at site *i* becomes
+
+  x′ = m̄ + α (x − mₛ)
+
+  where mₛ is sample *s*'s own mean over the bin and m̄ is the average of
+  those means across samples.
+  - Replacing mₛ by m̄ is the normalization. It shifts each sample, bin by bin,
+    to the common level, and is applied in full at every α. Local differences
+    such as DMRs survive because their sites are a tiny fraction of any bin.
+  - α only scales each site's deviation from its sample's bin mean. At α = 1
+    (default) deviations are kept exactly; this is *not* the identity, since
+    every sample is still shifted to the common level. At α = 0 sites collapse
+    to the bin's common level.
+- Within a bin the deviations are mostly sampling noise, so α < 1 shrinks noise
+  and makes downstream tests overconfident (more false positives). Keep α = 1
+  for differential analysis.
+- The between-group step cannot tell a global efficiency difference from a
+  genuine genome-wide biological difference and removes both. Turn it off
+  (`rate_between_groups = FALSE`) when conditions are expected to differ
+  genome-wide.
 
 ### Visualization and Diagnostics
 
@@ -119,8 +137,8 @@ single_data <- load_single_file(
 
 ### Normalization Parameters
 - `sites_per_quantile`: Controls quantile bin size (default = 1000)
-- `within_alpha`: Structure preservation for technical replicates (default = 0.3)
-- `between_alpha`: Structure preservation for group differences (default = 0.5)
+- `within_alpha`: Shrinkage of site-level deviations in the within-group step (default = 1, none)
+- `between_alpha`: Shrinkage of site-level deviations in the between-group step (default = 1, none)
 - Dynamic quantile calculation based on dataset size
 
 ### Visualization Options

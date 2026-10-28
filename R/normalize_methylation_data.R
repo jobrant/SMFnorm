@@ -11,8 +11,12 @@
 #' @param coverage_between_groups Logical, normalize coverage between groups
 #' @param rate_within_groups Logical, normalize rates within groups
 #' @param rate_between_groups Logical, normalize rates between groups
-#' @param within_alpha Alpha parameter for within-group rate preservation
-#' @param between_alpha Alpha parameter for between-group rate preservation
+#' @param within_alpha Shrinkage of site-level deviations in the within-group
+#'   rate step (default = 1, no shrinkage). The efficiency correction itself is
+#'   applied in full at any value; see \code{\link{normalize_methylation_rates}}.
+#' @param between_alpha Shrinkage of site-level deviations in the between-group
+#'   rate step (default = 1, no shrinkage). See
+#'   \code{\link{normalize_methylation_rates}}.
 #' @param min_coverage Minimum coverage threshold for including sites
 #' @param max_quantiles Maximum number of quantiles to use for rate normalization
 #' @param sites_per_quantile Target number of sites per quantile for rate normalization
@@ -22,6 +26,13 @@
 #' This function provides a unified interface to the complete methylation normalization
 #' workflow. It combines coverage normalization and methylation rate normalization in
 #' a single call with sensible defaults.
+#'
+#' The defaults (\code{within_alpha = 1}, \code{between_alpha = 1}) apply the
+#' full efficiency correction without shrinking site-level variation. Alpha
+#' values below 1 shrink sampling noise along with everything else and make
+#' downstream differential tests overconfident; they are not recommended for
+#' differential analysis. See \code{\link{normalize_methylation_rates}} for the
+#' formula and what each step removes.
 #'
 #' For advanced users the individual normalization functions
 #' \code{\link{normalize_coverage}} and \code{\link{normalize_methylation_rates}}
@@ -37,13 +48,13 @@
 #'   group_names = group_names
 #' )
 #'
-#' # Preserve biological differences between groups
+#' # Correct efficiency within groups only, e.g. when the conditions are
+#' # expected to differ genome-wide and the between-group step would remove
+#' # that difference along with any efficiency difference
 #' normalized_data <- normalize_methylation_data(
 #'   data_list = split_data,
 #'   group_names = group_names,
-#'   coverage_between_groups = FALSE,
-#'   rate_between_groups = TRUE,
-#'   between_alpha = 0.7
+#'   rate_between_groups = FALSE
 #' )
 #' }
 #'
@@ -60,8 +71,8 @@ normalize_methylation_data <- function(data_list,
                                        coverage_between_groups = FALSE,
                                        rate_within_groups = TRUE,
                                        rate_between_groups = TRUE,
-                                       within_alpha = 0.3,
-                                       between_alpha = 0.5,
+                                       within_alpha = 1,
+                                       between_alpha = 1,
                                        min_coverage = 5,
                                        max_quantiles = 50,
                                        sites_per_quantile = 1000,
