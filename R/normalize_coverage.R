@@ -128,6 +128,7 @@ normalize_coverage <- function(data_list, group_names = NULL,
   }
 
   names(normalized_groups) <- names(data_list)
+  attr(normalized_groups, "sample_metadata") <- attr(data_list, "sample_metadata")
   return(normalized_groups)
 }
 

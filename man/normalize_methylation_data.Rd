@@ -44,7 +44,9 @@ applied in full at any value; see \code{\link{normalize_methylation_rates}}.}
 rate step (default = 1, no shrinkage). See
 \code{\link{normalize_methylation_rates}}.}
 
-\item{min_coverage}{Minimum coverage threshold for including sites}
+\item{min_coverage}{Minimum coverage threshold. A site is kept only if every
+sample in every group has at least this coverage there, so all samples keep
+the same sites. Use 0 to skip the filter.}
 
 \item{max_quantiles}{Maximum number of quantiles to use for rate normalization}
 
@@ -53,7 +55,8 @@ rate step (default = 1, no shrinkage). See
 \item{diagnostics}{Logical, whether to output diagnostic information}
 }
 \value{
-Normalized methylation data list
+Normalized methylation data list with the same group and sample names
+as the input, and its \code{sample_metadata} attribute if it had one.
 }
 \description{
 Performs a complete normalization workflow for methylation data,
@@ -74,6 +77,9 @@ formula and what each step removes.
 For advanced users the individual normalization functions
 \code{\link{normalize_coverage}} and \code{\link{normalize_methylation_rates}}
 can be called directly.
+
+All samples must contain the same sites in the same row order, as returned by
+\code{\link{find_shared_sites}}; the function stops if they do not.
 }
 \examples{
 \dontrun{

@@ -159,10 +159,13 @@ normalize_methylation_rates <- function(data_list,
     for(group in names(data_list)) {
       n_samples <- length(data_list[[group]])
       result[[group]] <- normalized_data[current_idx:(current_idx + n_samples - 1)]
+      # unlist() above prefixed each sample name with its group name
+      names(result[[group]]) <- names(data_list[[group]])
       current_idx <- current_idx + n_samples
     }
   }
 
   names(result) <- names(data_list)
+  attr(result, "sample_metadata") <- attr(data_list, "sample_metadata")
   return(result)
 }

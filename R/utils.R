@@ -357,6 +357,53 @@
   invisible(group_means)
 }
 
+#' Check that all samples hold the same sites in the same row order
+#'
+#' Normalization works row by row across samples, so row i must be the same
+#' site in every sample. Compares row counts, then the site coordinates
+#' (\code{chr}, \code{pos} and \code{site} where present, otherwise \code{uid}).
+#' Tables with none of these columns can only be checked for row count.
+#'
+#' @param sample_list List of sample data frames.
+#' @return Invisibly \code{TRUE}; stops with an error if samples are not aligned.
+#' @keywords internal
+#' @noRd
+.check_sites_aligned <- function(sample_list) {
+  if (length(sample_list) < 2) return(invisible(TRUE))
+  ids <- names(sample_list)
+  if (is.null(ids)) ids <- as.character(seq_along(sample_list))
+  how <- paste0("All samples must contain the same sites in the same order. ",
+                "Run find_shared_sites() on the loaded data before splitting ",
+                "it into groups, and do not filter or reorder samples ",
+                "individually afterwards.")
+
+  n_rows <- vapply(sample_list, nrow, integer(1))
+  if (length(unique(n_rows)) > 1) {
+    stop("Samples have different numbers of sites (",
+         paste(ids, n_rows, sep = " = ", collapse = ", "), "). ", how,
+         call. = FALSE)
+  }
+
+  shared_cols <- Reduce(intersect, lapply(sample_list, names))
+  key_cols <- intersect(c("chr", "pos", "site"), shared_cols)
+  if (!all(c("chr", "pos") %in% key_cols)) {
+    key_cols <- intersect("uid", shared_cols)
+  }
+
+  as_key <- function(x) if (is.numeric(x)) as.numeric(x) else as.character(x)
+  ref <- sample_list[[1]]
+  for (i in seq_along(sample_list)[-1]) {
+    for (col in key_cols) {
+      if (!identical(as_key(ref[[col]]), as_key(sample_list[[i]][[col]]))) {
+        stop("Sample '", ids[i], "' does not have the same sites in the same ",
+             "order as sample '", ids[1], "' (column '", col, "' differs). ",
+             how, call. = FALSE)
+      }
+    }
+  }
+  invisible(TRUE)
+}
+
 #' Internal function to normalize methylation rates within a set of samples
 #'
 #' Within each quantile bin of mean rate, sample s's rate at site i becomes
@@ -380,26 +427,9 @@
 
   if(diagnostics) cat("Calculating average rates...\n")
   
-  # Debugging
-  rate_list <- lapply(sample_list, function(df) df$rate)
-  lens <- lengths(rate_list)
-  message("DEBUG .normalize_methylation_within_set row counts: ", 
-          paste(lens, collapse = ", "))
-  if (length(unique(lens)) > 1) {
-    stop(sprintf(
-      "Samples have unequal row counts before cbind: %s",
-      paste(names(lens), lens, sep = "=", collapse = ", ")
-    ))
-  }
-  avg_rates <- rowMeans(do.call(cbind, rate_list))
-
-  # Calculate average methylation rates
-  # rate_mat <- do.call(cbind, lapply(sample_list, `[[`, "rate"))
-  # avg_rates <- rowMeans(rate_mat)
-  # 
-  # if (!is.matrix(rate_mat) || ncol(rate_mat) != length(sample_list)) {
-  #   stop("Samples have inconsistent row counts — check find_shared_sites was applied")
-  # }
+  # All samples must hold the same sites in the same order
+  .check_sites_aligned(sample_list)
+  avg_rates <- rowMeans(do.call(cbind, lapply(sample_list, function(df) df$rate)))
 
   # Dynamic quantile calculation
   n_sites <- length(avg_rates)

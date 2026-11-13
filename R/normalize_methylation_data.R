@@ -17,7 +17,9 @@
 #' @param between_alpha Shrinkage of site-level deviations in the between-group
 #'   rate step (default = 1, no shrinkage). See
 #'   \code{\link{normalize_methylation_rates}}.
-#' @param min_coverage Minimum coverage threshold for including sites
+#' @param min_coverage Minimum coverage threshold. A site is kept only if every
+#'   sample in every group has at least this coverage there, so all samples keep
+#'   the same sites. Use 0 to skip the filter.
 #' @param max_quantiles Maximum number of quantiles to use for rate normalization
 #' @param sites_per_quantile Target number of sites per quantile for rate normalization
 #' @param diagnostics Logical, whether to output diagnostic information
@@ -38,7 +40,11 @@
 #' \code{\link{normalize_coverage}} and \code{\link{normalize_methylation_rates}}
 #' can be called directly.
 #'
-#' @return Normalized methylation data list
+#' All samples must contain the same sites in the same row order, as returned by
+#' \code{\link{find_shared_sites}}; the function stops if they do not.
+#'
+#' @return Normalized methylation data list with the same group and sample names
+#'   as the input, and its \code{sample_metadata} attribute if it had one.
 #'
 #' @examples
 #' \dontrun{
@@ -79,34 +85,39 @@ normalize_methylation_data <- function(data_list,
                                        diagnostics = FALSE) {
 
   group_names <- extract_group_names(data_list, diagnostics)
-  
-  # Diagnostic: row counts at entry
-  for (grp in names(data_list)) {
-    rc <- sapply(data_list[[grp]], nrow)
-    message(sprintf("DIAG entry - group %s: %s", grp,
-                    paste(names(rc), rc, sep="=", collapse=", ")))
-  }
 
-  # Step 0: Filter by minimum coverage if specified
-  if (min_coverage > 0) {
-    data_list <- lapply(data_list, function(group) {
-      lapply(group, function(df) {
-        cov_vals <- df$cov
-        message(sprintf(
-          "DIAG pre-filter: %d rows, cov range [%.3f, %.3f], mean=%.3f, n_pass (>=%.0f): %d",
-          nrow(df), min(cov_vals), max(cov_vals), mean(cov_vals),
-          min_coverage, sum(cov_vals >= min_coverage)
-        ))
-        df[cov_vals >= min_coverage, ]
-      })
-    })
+  # Input validation
+  if (!is.list(data_list)) stop("data_list must be a list")
+  if (!all(vapply(data_list, is.list, logical(1)))) {
+    stop("data_list must be a list of lists")
   }
-  
-  # Diagnostic: row counts after Step 0
-  for (grp in names(data_list)) {
-    rc <- sapply(data_list[[grp]], nrow)
-    message(sprintf("DIAG post-filter - group %s: %s", grp,
-                    paste(names(rc), rc, sep="=", collapse=", ")))
+  sample_metadata <- attr(data_list, "sample_metadata")
+  group_ids <- names(data_list)
+
+  # Every later step works row by row across samples, so all samples must hold
+  # the same sites in the same order.
+  .check_sites_aligned(unlist(unname(data_list), recursive = FALSE))
+
+  # Step 0: Filter by minimum coverage. A site is kept only if EVERY sample
+  # reaches min_coverage there, so all samples keep the same sites. Filtering
+  # each sample on its own coverage would leave them with different rows.
+  if (min_coverage > 0) {
+    keep <- Reduce(`&`, lapply(unlist(unname(data_list), recursive = FALSE),
+                               function(df) df$cov >= min_coverage))
+    if (!any(keep)) {
+      stop(sprintf("No sites have coverage >= %s in every sample.",
+                   format(min_coverage)), call. = FALSE)
+    }
+    if (diagnostics) {
+      message(sprintf(
+        "Coverage filter: kept %d of %d sites with coverage >= %s in every sample",
+        sum(keep), length(keep), format(min_coverage)))
+    }
+    if (!all(keep)) {
+      data_list <- lapply(data_list, function(group) {
+        lapply(group, function(df) df[keep, ])
+      })
+    }
   }
 
   # Step 1: Coverage normalization
@@ -115,13 +126,6 @@ normalize_methylation_data <- function(data_list,
                                     group_names = group_names,
                                     between_groups = coverage_between_groups,
                                     diagnostics = diagnostics)
-  }
-  
-  # Diagnostic: row counts after Step 1
-  for (grp in names(data_list)) {
-    rc <- sapply(data_list[[grp]], nrow)
-    message(sprintf("DIAG post-coverage-norm - group %s: %s", grp,
-                    paste(names(rc), rc, sep="=", collapse=", ")))
   }
 
   # Step 2: Rate normalization
@@ -137,5 +141,7 @@ normalize_methylation_data <- function(data_list,
                                              diagnostics = diagnostics)
   }
 
+  names(data_list) <- group_ids
+  attr(data_list, "sample_metadata") <- sample_metadata
   return(data_list)
 }
