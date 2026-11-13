@@ -396,7 +396,7 @@
 #' Internal function to normalize methylation rates within a set of samples
 #'
 #' Within each quantile bin of mean rate, sample s's rate at site i becomes
-#' \code{avg_quant_rate + alpha * (x - mean(x over the bin's sites))}: the
+#' \code{avg_quant_rate + alpha * (x - mean(x over the sites in the bin))}: the
 #' sample's own bin mean is replaced by the across-sample bin mean (the
 #' normalization, applied in full at any alpha), and alpha scales the site-level
 #' deviations. See \code{\link{normalize_methylation_rates}}.
