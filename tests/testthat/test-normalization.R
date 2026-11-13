@@ -386,3 +386,69 @@ test_that("within-only normalization keeps the group gap and shrinks spread", {
   expect_equal(abs(diff(gm(after))), abs(diff(gm(d))), tolerance = 0.05)
   expect_lte(sp(after), sp(d))
 })
+
+
+# ── Bin assignment is a function of mean rate only ───────────────────────────
+#
+# Rates computed from counts take few distinct values, so many sites share a
+# mean rate and some of those values sit exactly on a bin boundary. Bin
+# membership used to depend on the last floating-point digit of the rate:
+# computing it as (mc/3)/(cov/3) instead of mc/cov moved normalized rates by
+# up to ~0.015.
+
+# Two replicates at different depths: few distinct mean rates, so thousands of
+# sites sit exactly on a bin boundary.
+.count_based_set <- function(n = 50000, seed = 3) {
+  set.seed(seed)
+  p <- stats::rbeta(n, 1.2, 4)
+  effs <- c(1, 0.8)
+  depth <- c(15, 60)
+  setNames(lapply(seq_along(effs), function(i) {
+    cov <- pmax(10L, stats::rpois(n, depth[i]))
+    mc <- stats::rbinom(n, cov, p * effs[i])
+    data.table(chr = "1", pos = seq_len(n), site = "GCH",
+               cov = cov, mc = mc, rate = mc / cov)
+  }), paste0("S", seq_along(effs)))
+}
+
+.rates_after <- function(set, alpha = 1) {
+  out <- .normalize_methylation_within_set(set, alpha = alpha,
+                                           diagnostics = FALSE)
+  do.call(cbind, lapply(out, `[[`, "rate"))
+}
+
+test_that("floating-point-level differences in input rates do not change the result", {
+  set <- .count_based_set()
+  same <- lapply(set, function(dt) {
+    x <- copy(dt)
+    x[, rate := (mc / 3) / (cov / 3)]     # equal to mc/cov up to rounding error
+    x
+  })
+  input_diff <- max(mapply(function(a, b) max(abs(a$rate - b$rate)), set, same))
+  expect_gt(input_diff, 0)                # the inputs really do differ...
+  expect_lt(input_diff, 1e-12)            # ...but only in the last digits
+
+  expect_equal(.rates_after(same), .rates_after(set), tolerance = 1e-12)
+})
+
+test_that("sites with the same mean rate always share a bin", {
+  set <- .count_based_set()
+  mean_rate <- round(rowMeans(do.call(cbind, lapply(set, `[[`, "rate"))), 10)
+  expect_gt(sum(duplicated(mean_rate)), 1000)       # plenty of ties to test
+
+  # At alpha = 0 every site takes its bin's common level, so the output value
+  # identifies the bin.
+  bin_level <- .rates_after(set, alpha = 0)[, 1]
+  levels_per_rate <- tapply(bin_level, mean_rate, function(v) length(unique(v)))
+  expect_true(all(levels_per_rate == 1))
+})
+
+test_that("the result does not depend on the order of the sites", {
+  set <- .count_based_set(n = 5000)
+  set.seed(1)
+  perm <- sample(5000)
+  shuffled <- lapply(set, function(dt) dt[perm])
+
+  expect_equal(.rates_after(shuffled), .rates_after(set)[perm, ],
+               tolerance = 1e-12)
+})

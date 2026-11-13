@@ -388,6 +388,11 @@
   invisible(TRUE)
 }
 
+# Decimal places kept in a site's mean rate, and in bin boundaries, when sites
+# are assigned to rate bins. Far finer than any real difference in rate, far
+# coarser than floating-point rounding error.
+.bin_digits <- 10L
+
 #' Internal function to normalize methylation rates within a set of samples
 #'
 #' Within each quantile bin of mean rate, sample s's rate at site i becomes
@@ -415,6 +420,15 @@
   .check_sites_aligned(sample_list)
   avg_rates <- rowMeans(do.call(cbind, lapply(sample_list, function(df) df$rate)))
 
+  # Bin membership must depend on a site's mean rate only. Rates from counts
+  # take few distinct values, so many sites share a mean rate and some of those
+  # values fall exactly on a bin boundary. Without rounding, differences in the
+  # last floating-point digit (from how the rate was computed, or from the
+  # platform) decide which side of the boundary each tied site lands on, and
+  # that moved normalized rates by up to ~0.015. Rounding makes sites with the
+  # same mean rate exactly equal, so they always share a bin.
+  avg_rates <- round(avg_rates, .bin_digits)
+
   # Dynamic quantile calculation
   n_sites <- length(avg_rates)
   n_quantiles <- as.integer(max(5, min(n_sites/sites_per_quantile, max_quantiles)))
@@ -422,14 +436,16 @@
 
   # Create quantiles
   probs <- seq(0, 1, length.out = n_quantiles + 1)
-  breaks <- unique(quantile(avg_rates, prob = probs, names = FALSE))
+  breaks <- unique(round(quantile(avg_rates, prob = probs, names = FALSE),
+                         .bin_digits))
 
   if(length(breaks) < 3) {
     warning("Too few unique values for quantile binning. Reducing number of quantiles.")
     n_quantiles <- length(unique(avg_rates)) - 1
     if(n_quantiles < 2) stop("Not enough unique values for quantile normalization")
     probs <- seq(0, 1, length.out = n_quantiles + 1)
-    breaks <- unique(quantile(avg_rates, prob = probs, names = FALSE))
+    breaks <- unique(round(quantile(avg_rates, prob = probs, names = FALSE),
+                           .bin_digits))
   }
 
   rate_quantiles <- cut(avg_rates, breaks = breaks, include.lowest = TRUE)
