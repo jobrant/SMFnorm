@@ -300,23 +300,7 @@
 }
 
 
-# Coverage and Methylation Normalization Utilities ------------------------
-
-#' Internal function to normalize a group of samples
-#' @param replicates List of replicate data frames
-#' @param sf Vector of scaling factors
-#' @return List of normalized data frames
-#' @keywords internal
-.normalize_group <- function(replicates, sf) {
-  purrr::map2(replicates, sf, function(df, s) {
-    if (is.na(s)) stop("Scaling factor is NA")
-    dt <- data.table::copy(df)
-    data.table::set(dt, j = "cov",  value = dt$cov / s)
-    data.table::set(dt, j = "mc",   value = dt$mc  / s)
-    data.table::set(dt, j = "rate", value = ifelse(dt$cov > 0, dt$mc / dt$cov, 0))
-    return(dt)
-  })
-}
+# Methylation Normalization Utilities -------------------------------------
 
 #' Warn when within-group-only normalization meets unequal group levels
 #'

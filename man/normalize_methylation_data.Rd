@@ -7,9 +7,7 @@
 normalize_methylation_data(
   data_list,
   group_names = NULL,
-  do_coverage_norm = TRUE,
   normalize_rates = TRUE,
-  coverage_between_groups = FALSE,
   rate_within_groups = TRUE,
   rate_between_groups = TRUE,
   within_alpha = 1,
@@ -26,11 +24,7 @@ normalize_methylation_data(
 \item{group_names}{Optional character vector of group names. If NULL (default),
 will be extracted from the metadata attached to data_list.}
 
-\item{do_coverage_norm}{Logical, whether to perform coverage normalization}
-
 \item{normalize_rates}{Logical, whether to perform rate normalization}
-
-\item{coverage_between_groups}{Logical, normalize coverage between groups}
 
 \item{rate_within_groups}{Logical, normalize rates within groups}
 
@@ -59,13 +53,14 @@ Normalized methylation data list with the same group and sample names
 as the input, and its \code{sample_metadata} attribute if it had one.
 }
 \description{
-Performs a complete normalization workflow for methylation data,
-handling both coverage and methylation rates.
+Filters sites by coverage and normalizes methylation rates.
 }
 \details{
 This function provides a unified interface to the complete methylation normalization
-workflow. It combines coverage normalization and methylation rate normalization in
-a single call with sensible defaults.
+workflow: a coverage filter shared by all samples, then methylation rate
+normalization. Read counts and coverage are not rescaled, so \code{cov}
+stays the observed sequencing depth. For depth-scaled coverage tracks, see
+the \code{normalize_coverage} argument of \code{\link{create_bigwig}}.
 
 The defaults (\code{within_alpha = 1}, \code{between_alpha = 1}) apply the
 full efficiency correction without shrinking site-level variation. Alpha
@@ -74,9 +69,7 @@ downstream differential tests overconfident; they are not recommended for
 differential analysis. See \code{\link{normalize_methylation_rates}} for the
 formula and what each step removes.
 
-For advanced users the individual normalization functions
-\code{\link{normalize_coverage}} and \code{\link{normalize_methylation_rates}}
-can be called directly.
+\code{\link{normalize_methylation_rates}} can also be called directly.
 
 All samples must contain the same sites in the same row order, as returned by
 \code{\link{find_shared_sites}}; the function stops if they do not.
@@ -101,6 +94,5 @@ normalized_data <- normalize_methylation_data(
 
 }
 \seealso{
-\code{\link{normalize_coverage}} for coverage normalization only
 \code{\link{normalize_methylation_rates}} for rate normalization only
 }

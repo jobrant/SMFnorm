@@ -9,7 +9,6 @@ test_that("rate always equals mc/cov after normalization", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = TRUE,
@@ -40,7 +39,6 @@ test_that("mc values are non-negative after normalization", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
@@ -64,7 +62,6 @@ test_that("cov values are positive after normalization", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = FALSE,
     min_coverage = 1,
     diagnostics = FALSE
@@ -89,7 +86,6 @@ test_that("no NaN, NA, or Inf values after full normalization", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = TRUE,
@@ -134,7 +130,6 @@ test_that("normalization handles sites with rate = 0", {
   # Should not error
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
@@ -166,7 +161,6 @@ test_that("normalization handles sites with rate = 1", {
   # Should not error
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
@@ -191,7 +185,6 @@ test_that("normalization handles two samples per group", {
   expect_no_error({
     normalized <- normalize_methylation_data(
       split_data,
-      do_coverage_norm = TRUE,
       normalize_rates = TRUE,
       within_alpha = 0.3,
       min_coverage = 1,
@@ -211,7 +204,6 @@ test_that("normalization preserves number of samples and groups", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
@@ -238,7 +230,6 @@ test_that("normalization preserves genomic coordinate columns", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,

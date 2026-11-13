@@ -60,13 +60,12 @@ single_data <- load_single_file(
 ```
 ### Normalization Process
 
-#### 1. Coverage Normalization (`normalize_coverage`)
-- Normalizes coverage depth across samples
-- Features:
-  - Within-group normalization for technical replicates
-  - Optional between-group normalization
-  - Scaling factor calculation based on total coverage
-  - Preserves relative coverage patterns
+#### 1. Coverage Filter
+- `normalize_methylation_data()` keeps a site only if every sample has at least
+  `min_coverage` reads there, so all samples keep the same sites
+- Read counts and coverage are not rescaled: `cov` stays the observed depth
+- For depth-scaled coverage tracks in a genome browser, use
+  `create_bigwig(type = "cov", normalize_coverage = TRUE)`
 
 #### 2. Methylation Rate Normalization (`normalize_methylation_rates`)
 - Quantile-bin normalization of labeling-efficiency differences

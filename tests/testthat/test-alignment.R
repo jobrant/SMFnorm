@@ -10,7 +10,7 @@
 
 .norm <- function(d, ...) {
   suppressMessages(normalize_methylation_data(
-    d, do_coverage_norm = FALSE, diagnostics = FALSE, ...
+    d, diagnostics = FALSE, ...
   ))
 }
 
@@ -153,7 +153,7 @@ test_that("each sample comes back holding its own data", {
 })
 
 
-test_that("the sample_metadata attribute survives every normalization entry point", {
+test_that("the sample_metadata attribute survives both normalization entry points", {
   d <- make_test_split_data(n_reps_per_group = 2, n_sites = 500, seed = 3)
   meta <- attr(d, "sample_metadata")
   expect_false(is.null(meta))
@@ -161,9 +161,6 @@ test_that("the sample_metadata attribute survives every normalization entry poin
   full <- suppressMessages(normalize_methylation_data(d, min_coverage = 12,
                                                       diagnostics = FALSE))
   expect_identical(attr(full, "sample_metadata"), meta)
-
-  cov_only <- suppressMessages(normalize_coverage(d, diagnostics = FALSE))
-  expect_identical(attr(cov_only, "sample_metadata"), meta)
 
   rates_only <- suppressMessages(normalize_methylation_rates(d, diagnostics = FALSE))
   expect_identical(attr(rates_only, "sample_metadata"), meta)

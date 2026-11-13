@@ -27,6 +27,10 @@
 #' @param split_strand Logical. If \code{TRUE}, creates separate BigWig files
 #'   for forward and reverse strands. If \code{FALSE} (default), all data is
 #'   exported as unstranded.
+#' @param normalize_coverage Logical. Only for \code{type = "cov"}. If
+#'   \code{TRUE}, coverage is divided by a depth scaling factor so that tracks
+#'   from libraries sequenced to different depths can be compared; see Details.
+#'   The file is written with a \code{_covnorm} suffix. Default is \code{FALSE}.
 #'
 #' @return Character vector of created BigWig file path(s). If
 #'   \code{split_strand = TRUE}, returns paths for both strand files.
@@ -40,6 +44,15 @@
 #' For aggregated replicates, methylation rates are calculated as a
 #' coverage-weighted mean: \code{sum(mc) / sum(cov)} across all replicates
 #' in the group.
+#'
+#' With \code{normalize_coverage = TRUE}, coverage is divided by
+#' \code{total / mean(totals)}, where \code{total} is the summed coverage of
+#' the exported sample and \code{totals} are the summed coverages of all
+#' samples in \code{meth_data}. With \code{aggregate_replicates = TRUE} the
+#' totals are per group. Totals use every site in \code{meth_data}, before
+#' the \code{min_coverage} filter, which is applied to the observed coverage.
+#' The scaled values are for display only: they are not sequencing depths and
+#' should not be used as counts in a statistical test.
 #'
 #' This function requires the \pkg{rtracklayer} package. Install it from
 #' Bioconductor with \code{BiocManager::install("rtracklayer")} if needed.
@@ -58,6 +71,15 @@
 #'   out = "bigwigs",
 #'   sample_name = "allc_M1N2",
 #'   type = "meth"
+#' )
+#'
+#' # Export depth-scaled coverage for one sample
+#' create_bigwig(
+#'   meth_data = all_samples,
+#'   out = "bigwigs",
+#'   sample_name = "allc_M1N2",
+#'   type = "cov",
+#'   normalize_coverage = TRUE
 #' )
 #'
 #' # Export aggregated replicates, split by strand
@@ -85,7 +107,8 @@ create_bigwig <- function(
     chrom_sizes_file = NULL,
     aggregate_replicates = FALSE,
     min_coverage = 1,
-    split_strand = FALSE)
+    split_strand = FALSE,
+    normalize_coverage = FALSE)
 {
   # Check rtracklayer availability
   
@@ -97,6 +120,14 @@ create_bigwig <- function(
   }
   
   type <- match.arg(type)
+
+  if (!is.logical(normalize_coverage) || length(normalize_coverage) != 1 ||
+      is.na(normalize_coverage)) {
+    stop("'normalize_coverage' must be TRUE or FALSE.")
+  }
+  if (normalize_coverage && type != "cov") {
+    stop("'normalize_coverage = TRUE' only applies to type = \"cov\".")
+  }
   
   # Validate inputs
   if (!is.list(meth_data)) {
@@ -162,12 +193,23 @@ create_bigwig <- function(
                     n_before - n_after, min_coverage, n_after))
   }
   
+  # Depth scaling for coverage tracks (after filtering on observed coverage)
+  file_tag <- type
+  if (normalize_coverage) {
+    sf <- .coverage_scale_factor(meth_data, sample_metadata,
+                                 aggregate_replicates, file_base)
+    export_dt[, cov := cov / sf]
+    file_tag <- "covnorm"
+    message(sprintf("Coverage divided by depth scaling factor %.4f", sf))
+  }
+
   # Write BigWig file(s) 
   if (split_strand) {
-    out_files <- .write_bigwig_by_strand(export_dt, type, out, file_base, genome_info)
+    out_files <- .write_bigwig_by_strand(export_dt, type, out, file_base,
+                                         genome_info, file_tag = file_tag)
   } else {
     out_file <- .write_bigwig(export_dt, type, out, file_base,
-                              genome_info, strand_label = "")
+                              genome_info, strand_label = "", file_tag = file_tag)
     out_files <- out_file
   }
   
@@ -289,7 +331,8 @@ create_bigwig <- function(
 #' @return File path of created BigWig
 #' @keywords internal
 #' @noRd
-.write_bigwig <- function(dt, type, out, file_base, genome_info, strand_label = "") {
+.write_bigwig <- function(dt, type, out, file_base, genome_info, strand_label = "",
+                          file_tag = type) {
   score_col <- if (type == "meth") "rate" else "cov"
   
   # BigWig does not support strand — set to unstranded
@@ -320,7 +363,7 @@ create_bigwig <- function(
   gr <- GenomeInfoDb::keepSeqlevels(gr, shared_levels, pruning.mode = "coarse")
   GenomeInfoDb::seqinfo(gr) <- genome_info[GenomeInfoDb::seqlevels(gr)]
   
-  out_file <- file.path(out, paste0(file_base, strand_label, "_", type, ".bw"))
+  out_file <- file.path(out, paste0(file_base, strand_label, "_", file_tag, ".bw"))
   
   rtracklayer::export.bw(gr, out_file)
   message("Wrote: ", out_file)
@@ -333,7 +376,8 @@ create_bigwig <- function(
 #' @return Character vector of file paths
 #' @keywords internal
 #' @noRd
-.write_bigwig_by_strand <- function(dt, type, out, file_base, genome_info) {
+.write_bigwig_by_strand <- function(dt, type, out, file_base, genome_info,
+                                    file_tag = type) {
   out_files <- character(0)
   
   fwd_dt <- dt[strand == "+"]
@@ -341,7 +385,8 @@ create_bigwig <- function(
   
   if (nrow(fwd_dt) > 0) {
     fwd_file <- .write_bigwig(fwd_dt, type, out, file_base,
-                              genome_info, strand_label = "_fwd")
+                              genome_info, strand_label = "_fwd",
+                              file_tag = file_tag)
     out_files <- c(out_files, fwd_file)
   } else {
     message("No forward-strand sites to export.")
@@ -349,7 +394,8 @@ create_bigwig <- function(
   
   if (nrow(rev_dt) > 0) {
     rev_file <- .write_bigwig(rev_dt, type, out, file_base,
-                              genome_info, strand_label = "_rev")
+                              genome_info, strand_label = "_rev",
+                              file_tag = file_tag)
     out_files <- c(out_files, rev_file)
   } else {
     message("No reverse-strand sites to export.")
@@ -361,7 +407,8 @@ create_bigwig <- function(
     message(sprintf("Note: %d sites with unrecognized strand values exported separately.",
                     nrow(unstranded_dt)))
     unstrand_file <- .write_bigwig(unstranded_dt, type, out, file_base,
-                                   genome_info, strand_label = "_unstranded")
+                                   genome_info, strand_label = "_unstranded",
+                              file_tag = file_tag)
     out_files <- c(out_files, unstrand_file)
   }
   
@@ -370,4 +417,35 @@ create_bigwig <- function(
   }
   
   return(out_files)
+}
+
+
+#' Depth scaling factor for a coverage track
+#'
+#' The exported unit's total coverage divided by the mean total coverage of
+#' all units: samples, or groups when replicates are aggregated.
+#'
+#' @param meth_data Flat list of samples.
+#' @param sample_metadata data.table with \code{group_id} and \code{sample_id}.
+#' @param aggregate_replicates Logical; if \code{TRUE}, units are groups.
+#' @param unit Sample ID or group ID being exported.
+#' @return Numeric scalar.
+#' @keywords internal
+#' @noRd
+.coverage_scale_factor <- function(meth_data, sample_metadata,
+                                   aggregate_replicates, unit) {
+  totals <- vapply(meth_data, function(dt) sum(as.numeric(dt$cov)), numeric(1))
+
+  if (aggregate_replicates) {
+    in_data <- sample_metadata$sample_id %in% names(meth_data)
+    totals <- tapply(totals[sample_metadata$sample_id[in_data]],
+                     sample_metadata$group_id[in_data], sum)
+  }
+
+  if (anyNA(totals) || any(totals <= 0)) {
+    stop("Cannot scale coverage: total coverage is missing or zero for: ",
+         paste(names(totals)[is.na(totals) | totals <= 0], collapse = ", "))
+  }
+
+  unname(totals[[unit]] / mean(totals))
 }

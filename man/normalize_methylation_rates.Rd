@@ -17,7 +17,8 @@ normalize_methylation_rates(
 )
 }
 \arguments{
-\item{data_list}{List of normalized coverage data}
+\item{data_list}{List of methylation data by group, with the same sites in
+the same row order in every sample}
 
 \item{group_names}{Optional character vector of group names. If NULL (default),
 will be extracted from the metadata attached to data_list.}

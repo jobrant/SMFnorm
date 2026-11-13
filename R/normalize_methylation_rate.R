@@ -3,7 +3,8 @@
 #' Normalizes methylation rates using quantile-based normalization to account for
 #' non-linear enzyme efficiency differences.
 #'
-#' @param data_list List of normalized coverage data
+#' @param data_list List of methylation data by group, with the same sites in
+#'   the same row order in every sample
 #' @param group_names Optional character vector of group names. If NULL (default),
 #'   will be extracted from the metadata attached to data_list.
 #' @param within_groups Logical indicating whether to normalize within groups (default = TRUE)

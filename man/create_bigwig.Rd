@@ -14,7 +14,8 @@ create_bigwig(
   chrom_sizes_file = NULL,
   aggregate_replicates = FALSE,
   min_coverage = 1,
-  split_strand = FALSE
+  split_strand = FALSE,
+  normalize_coverage = FALSE
 )
 }
 \arguments{
@@ -48,6 +49,11 @@ Default is 1.}
 \item{split_strand}{Logical. If \code{TRUE}, creates separate BigWig files
 for forward and reverse strands. If \code{FALSE} (default), all data is
 exported as unstranded.}
+
+\item{normalize_coverage}{Logical. Only for \code{type = "cov"}. If
+\code{TRUE}, coverage is divided by a depth scaling factor so that tracks
+from libraries sequenced to different depths can be compared; see Details.
+The file is written with a \code{_covnorm} suffix. Default is \code{FALSE}.}
 }
 \value{
 Character vector of created BigWig file path(s). If
@@ -70,6 +76,15 @@ For aggregated replicates, methylation rates are calculated as a
 coverage-weighted mean: \code{sum(mc) / sum(cov)} across all replicates
 in the group.
 
+With \code{normalize_coverage = TRUE}, coverage is divided by
+\code{total / mean(totals)}, where \code{total} is the summed coverage of
+the exported sample and \code{totals} are the summed coverages of all
+samples in \code{meth_data}. With \code{aggregate_replicates = TRUE} the
+totals are per group. Totals use every site in \code{meth_data}, before
+the \code{min_coverage} filter, which is applied to the observed coverage.
+The scaled values are for display only: they are not sequencing depths and
+should not be used as counts in a statistical test.
+
 This function requires the \pkg{rtracklayer} package. Install it from
 Bioconductor with \code{BiocManager::install("rtracklayer")} if needed.
 }
@@ -87,6 +102,15 @@ create_bigwig(
   out = "bigwigs",
   sample_name = "allc_M1N2",
   type = "meth"
+)
+
+# Export depth-scaled coverage for one sample
+create_bigwig(
+  meth_data = all_samples,
+  out = "bigwigs",
+  sample_name = "allc_M1N2",
+  type = "cov",
+  normalize_coverage = TRUE
 )
 
 # Export aggregated replicates, split by strand

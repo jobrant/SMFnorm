@@ -1,66 +1,5 @@
 # tests/testthat/test-normalization.R
 
-# ── Coverage normalization ───────────────────────────────────────────────────
-
-test_that("normalize_coverage equalizes mean coverage within groups", {
-  split_data <- make_test_split_data(
-    n_reps_per_group = 3, n_sites = 200, seed = 42
-  )
-
-  normalized <- normalize_coverage(split_data, diagnostics = FALSE)
-
-  # Within each group, mean coverage should be approximately equal
-  for (g in names(normalized)) {
-    mean_covs <- sapply(normalized[[g]], function(dt) mean(dt$cov))
-    # All means within 1% of each other
-    relative_range <- diff(range(mean_covs)) / mean(mean_covs)
-    expect_lt(relative_range, 0.01,
-              label = paste("Coverage range within group", g))
-  }
-})
-
-
-test_that("normalize_coverage preserves rates", {
-  split_data <- make_test_split_data(
-    n_reps_per_group = 2, n_sites = 100, seed = 42
-  )
-
-  # Record original rates
-  orig_rates <- lapply(split_data, function(g) {
-    lapply(g, function(dt) dt$rate)
-  })
-
-  normalized <- normalize_coverage(split_data, diagnostics = FALSE)
-
-  # Rates should be unchanged (coverage norm scales mc and cov together)
-  for (g in names(normalized)) {
-    for (r in names(normalized[[g]])) {
-      new_rates <- normalized[[g]][[r]]$rate
-      old_rates <- orig_rates[[g]][[r]]
-      expect_equal(new_rates, old_rates, tolerance = 1e-10,
-                   label = paste("Rates preserved for", g, r))
-    }
-  }
-})
-
-
-test_that("normalize_coverage mc never exceeds cov", {
-  split_data <- make_test_split_data(
-    n_reps_per_group = 2, n_sites = 200, seed = 42
-  )
-
-  normalized <- normalize_coverage(split_data, diagnostics = FALSE)
-
-  for (g in names(normalized)) {
-    for (r in names(normalized[[g]])) {
-      dt <- normalized[[g]][[r]]
-      expect_true(all(dt$mc <= dt$cov),
-                  label = paste("mc <= cov for", g, r))
-    }
-  }
-})
-
-
 # ── Rate normalization ───────────────────────────────────────────────────────
 
 test_that("normalize_methylation_data clamps rates to [0, 1]", {
@@ -70,7 +9,6 @@ test_that("normalize_methylation_data clamps rates to [0, 1]", {
 
   normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = FALSE,
@@ -98,7 +36,6 @@ test_that("normalize_methylation_data mc never exceeds cov after normalization",
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = TRUE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = TRUE,
@@ -133,7 +70,6 @@ test_that("rate normalization reduces within-group variance", {
 
   normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
-    do_coverage_norm = FALSE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = FALSE,
@@ -163,7 +99,6 @@ test_that("alpha = 0 collapses all rates to quantile mean", {
 
   normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
-    do_coverage_norm = FALSE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = FALSE,
@@ -194,7 +129,6 @@ test_that("alpha = 1 preserves original rate structure", {
 
   normalized <- quiet_within_only(normalize_methylation_data(
     split_data,
-    do_coverage_norm = FALSE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = FALSE,
@@ -231,7 +165,6 @@ test_that("min_coverage filter removes low-coverage sites", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = FALSE,
     normalize_rates = FALSE,
     min_coverage = 5,
     diagnostics = FALSE
@@ -269,7 +202,6 @@ test_that("between-group normalization reduces group-level differences", {
 
   normalized <- normalize_methylation_data(
     split_data,
-    do_coverage_norm = FALSE,
     normalize_rates = TRUE,
     rate_within_groups = TRUE,
     rate_between_groups = TRUE,
@@ -388,7 +320,7 @@ test_that("between-group step at alpha = 1 removes a global group shift", {
   before <- abs(diff(gm(split_data)))
 
   normalized <- normalize_methylation_data(
-    split_data, do_coverage_norm = FALSE, normalize_rates = TRUE,
+    split_data, normalize_rates = TRUE,
     rate_within_groups = TRUE, rate_between_groups = TRUE,
     within_alpha = 1, between_alpha = 1, min_coverage = 1,
     diagnostics = FALSE
@@ -424,7 +356,7 @@ test_that("between-group step at alpha = 1 removes a global group shift", {
 
 .norm_quiet <- function(d, rbg) {
   normalize_methylation_data(
-    d, do_coverage_norm = FALSE, normalize_rates = TRUE,
+    d, normalize_rates = TRUE,
     rate_within_groups = TRUE, rate_between_groups = rbg,
     min_coverage = 1, diagnostics = FALSE
   )
