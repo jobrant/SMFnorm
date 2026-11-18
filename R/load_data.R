@@ -20,6 +20,13 @@
 #' @return A list of data.tables containing processed methylation data, or a
 #'    single data.table if single_file is provided.
 #'
+#' @details Files are tab-separated (optionally gzipped) with columns chr,
+#'   pos, strand, site, mc, cov; further columns are ignored. A first line that
+#'   is not a record is treated as a header. Loading stops with an error if a
+#'   file named in the sample sheet is missing, is truncated, has no records,
+#'   or contains a line that is not a valid record. Any chromosome names are
+#'   accepted.
+#'
 #' @export
 
 load_data <- function(dir_path, sample_sheet, type = NULL, groups = NULL,
@@ -66,11 +73,8 @@ load_data <- function(dir_path, sample_sheet, type = NULL, groups = NULL,
   files.list <- file.path(dir_path, sample_data$file_name)
   names(files.list) <- sample_data$sample_id
 
-  # Check file existence
+  # Check file existence (a missing file is an error)
   files.list <- .check_files_exist(files.list)
-  if (length(files.list) < 2) {
-    stop("At least two valid files are required for analysis.")
-  }
 
   # Determine whether to use C++ implementation
   has_rcpp <- requireNamespace("Rcpp", quietly = TRUE) &&

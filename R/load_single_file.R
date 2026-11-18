@@ -30,14 +30,13 @@ load_single_file <- function(file_path, use_cpp = TRUE, min_coverage = 0L) {
 
   # Load data using appropriate implementation
   if (has_cpp) {
-    # Use the C++ function
-    df <- readMethylationFile(file_path, min_coverage = min_coverage)
-    df <- data.table::as.data.table(df)
-    df[, rate := ifelse(cov > 0, mc/cov, 0)]
-    .create_uid(df)  # fast numeric key
+    df <- data.table::as.data.table(
+      readMethylationFile(file_path, min_coverage = min_coverage))
   } else {
     df <- .load_single_file_r(file_path, min_coverage = min_coverage)
   }
+  df[, rate := ifelse(cov > 0, mc/cov, 0)]
+  .create_uid(df)  # fast numeric key
 
   end_time <- Sys.time()
   elapsed <- end_time - start_time

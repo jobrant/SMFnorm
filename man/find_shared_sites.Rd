@@ -7,8 +7,9 @@
 find_shared_sites(allc, filter = TRUE, quiet = FALSE)
 }
 \arguments{
-\item{allc}{A list of samples returned by load_data(), with each element
-being a data.table containing a \code{uniqueID} column.}
+\item{allc}{A list of samples returned by load_data(): data.tables with
+columns \code{chr}, \code{pos} and \code{site} (or, failing that, a \code{uid} or legacy
+\code{uniqueID} column).}
 
 \item{filter}{Logical, whether to filter the data to only include shared sites (default = TRUE).
 If FALSE, only returns the vector of shared site IDs.}
@@ -16,9 +17,16 @@ If FALSE, only returns the vector of shared site IDs.}
 \item{quiet}{Logical, whether to suppress progress messages (default = FALSE).}
 }
 \value{
-If filter=TRUE, returns the filtered list with only shared sites.
-If filter=FALSE, returns a vector of shared site identifiers (uniqueID values).
+If filter=TRUE, a new list holding only the shared sites, with every
+sample in the same row order (sorted by \code{uid}). The input tables are not
+modified. If filter=FALSE, the vector of shared site identifiers.
 }
 \description{
 Identify shared sites across all samples and optionally filters data to only include these sites.
+}
+\details{
+Sites are matched on chromosome, position and context. Chromosome
+names are matched as written, except that the standard names (1-22, X, Y,
+M) match with or without a "chr" prefix. A sample containing the same site
+twice is an error.
 }

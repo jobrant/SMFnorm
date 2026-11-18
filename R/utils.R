@@ -90,60 +90,48 @@
 }
 
 #' Internal function to validate input files
-#' @param files.list list or character vector of file names
-#' @return list or character vector of file names
+#'
+#' A file named in the sample sheet but missing from the directory is an
+#' error: carrying on without it would silently drop a replicate.
+#' @param files.list Named character vector of file paths
+#' @return files.list, unchanged
 #' @keywords internal
 #' @noRd
 .check_files_exist <- function(files.list) {
-  existing_files <- file.exists(files.list)
-  if (!all(existing_files)) {
-    warning(sprintf("%d files from sample sheet not found in directory",
-                    sum(!existing_files)))
-    message("Missing files: ", paste(files.list[!existing_files], collapse=", "))
-    files.list <- files.list[existing_files]
-  }
-
-  # Validation step
   if (length(files.list) == 0) {
-    stop("No files found in the directory matching the sample sheet.")
+    stop("No files to load: the sample sheet has no rows after filtering.",
+         call. = FALSE)
+  }
+  missing_files <- files.list[!file.exists(files.list)]
+  if (length(missing_files) > 0) {
+    stop(sprintf("%d file(s) named in the sample sheet were not found:\n  %s",
+                 length(missing_files), paste(missing_files, collapse = "\n  ")),
+         call. = FALSE)
   }
   if (length(files.list) < 2) {
-    stop("At least two files are required for analysis.")
+    stop("At least two files are required for analysis.", call. = FALSE)
   }
-
-  message(sprintf("Loading %d files...", length(files.list)))
-
   return(files.list)
 }
 
 # Internal function to load using C++ implementation
 .load_data_cpp <- function(files.list, cores, min_coverage = 0L) {
-  # Call the C++ function
   raw_data <- readMethylationFiles(files.list, min_coverage = min_coverage)
-  names(raw_data) <- names(files.list)
-
-  # Convert to data.tables and add calculated columns
-  all_samples <- lapply(seq_along(raw_data), function(i) {
-    df <- as.data.table(raw_data[[i]])
-    df[, rate := ifelse(cov > 0, mc/cov, 0)]
-    .create_uid(df)  # fast numeric key
-    return(df)
-  })
-
-  names(all_samples) <- names(raw_data)
+  all_samples <- lapply(raw_data, data.table::as.data.table)
+  names(all_samples) <- names(files.list)
   return(all_samples)
 }
 
 # Internal function as fallback using pure R
 .load_data_r <- function(files.list, cores, min_coverage = 0L) {
-  
+
   if (cores > 1 && requireNamespace("parallel", quietly = TRUE)) {
     # Use parallel processing
-    all_samples <- .load_data_parallel(files.list, cores, 
+    all_samples <- .load_data_parallel(files.list, cores,
                                        min_coverage = min_coverage)
   } else {
     # Use sequential processing with progress bar
-    all_samples <- .load_data_sequential(files.list, 
+    all_samples <- .load_data_sequential(files.list,
                                          min_coverage = min_coverage)
   }
 
@@ -151,70 +139,94 @@
 }
 
 #' Internal function to load a single file using R
-#' @return data.table of methylation data
+#'
+#' Reads the same records as the C++ reader (\code{readMethylationFile}) and
+#' fails in the same cases: a first line that is not a record is taken as a
+#' header and skipped, blank lines are skipped, and any other line that is not
+#' a valid record is an error, as is a file with no records.
+#'
+#' @return data.table with columns chr, pos, strand, site, mc, cov
 #' @keywords internal
 #' @noRd
 .load_single_file_r <- function(file, min_coverage = 0L) {
-  tryCatch({
-    # Use base R to read the gzipped file
-    con <- gzfile(file, "r")
-    data_lines <- readLines(con)
-    close(con)
+  con <- gzfile(file, "r")
+  # A truncated gzip stream surfaces as a warning from readLines(); treat it
+  # as an error. A missing final newline is harmless.
+  lines <- withCallingHandlers(
+    tryCatch(readLines(con), finally = close(con)),
+    warning = function(w) {
+      if (grepl("incomplete final line", conditionMessage(w), fixed = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+      stop("Error reading ", file, ": ", conditionMessage(w),
+           " (the file may be truncated or corrupt).", call. = FALSE)
+    })
 
-    # Split the tab-delimited lines
-    split_lines <- strsplit(data_lines, "\t")
+  line_no <- seq_along(lines)
+  blank <- !nzchar(trimws(lines))
+  lines <- lines[!blank]
+  line_no <- line_no[!blank]
+  if (length(lines) == 0) {
+    stop("No records found in ", file, ".", call. = FALSE)
+  }
 
-    # Extract the columns we need
-    n_rows <- length(split_lines)
+  fields <- data.table::tstrsplit(lines, "\t", fixed = TRUE, fill = NA_character_)
+  if (length(fields) < 6) {
+    stop(file, ": expected at least 6 tab-separated columns ",
+         "(chr, pos, strand, site, mc, cov), found ", length(fields), ".",
+         call. = FALSE)
+  }
+  as_int <- function(x) {
+    out <- rep(NA_integer_, length(x))
+    ok <- !is.na(x) & grepl("^[+-]?[0-9]+$", x)
+    out[ok] <- suppressWarnings(as.integer(x[ok]))
+    out
+  }
+  pos <- as_int(fields[[2]])
+  mc  <- as_int(fields[[5]])
+  cov <- as_int(fields[[6]])
+  bad <- is.na(pos) | is.na(mc) | is.na(cov) | is.na(fields[[1]]) |
+    is.na(fields[[3]]) | is.na(fields[[4]])
 
-    # Preallocate vectors for efficiency
-    chr <- character(n_rows)
-    pos <- integer(n_rows)
-    strand <- character(n_rows)
-    site <- character(n_rows)
-    mc <- integer(n_rows)
-    cov <- integer(n_rows)
+  keep <- rep(TRUE, length(lines))
+  if (bad[1]) {           # header line
+    keep[1] <- FALSE
+    bad[1] <- FALSE
+  }
+  if (any(bad)) {
+    stop(sprintf(paste0("%s: line %d is not a valid record (expected chr, pos, ",
+                        "strand, site, mc, cov separated by tabs)."),
+                 file, line_no[which(bad)[1]]), call. = FALSE)
+  }
+  wrong <- keep & (mc < 0L | cov < 0L | mc > cov)
+  if (any(wrong)) {
+    stop(sprintf("%s: line %d has impossible counts (mc = %d, cov = %d).",
+                 file, line_no[which(wrong)[1]], mc[which(wrong)[1]],
+                 cov[which(wrong)[1]]), call. = FALSE)
+  }
+  if (!any(keep)) {
+    stop("No records found in ", file, ".", call. = FALSE)
+  }
 
-    # Extract data column by column
-    for (i in 1:n_rows) {
-      line <- split_lines[[i]]
-      chr[i] <- line[1]
-      pos[i] <- as.integer(line[2])
-      strand[i] <- line[3]
-      site[i] <- line[4]
-      mc[i] <- as.integer(line[5])
-      cov[i] <- as.integer(line[6])
-    }
+  df <- data.table::data.table(
+    chr = fields[[1]][keep],
+    pos = pos[keep],
+    strand = fields[[3]][keep],
+    site = fields[[4]][keep],
+    mc = mc[keep],
+    cov = cov[keep]
+  )
 
-    # Create the data.table
-    df <- data.table::data.table(
-      chr = chr,
-      pos = pos,
-      strand = strand,
-      site = site,
-      mc = mc,
-      cov = cov
-    )
+  # Apply minimum coverage filter
+  if (min_coverage > 0L) {
+    df <- df[cov >= min_coverage]
+  }
 
-    # Safely calculate rate
-    df[, rate := ifelse(cov > 0, mc/cov, 0)]
-    .create_uid(df)
-    
-    # Apply minimum coverage filter
-    if (min_coverage > 0L) {
-      df <- df[cov >= min_coverage]
-    }
-
-    return(df)
-  }, error = function(e) {
-    message("Error processing file: ", file)
-    message("Error message: ", e$message)
-    return(NULL)
-  })
+  return(df)
 }
 
 #' Internal function to sequentially load files using R implementation
-#' @return data.table of methylation data
+#' @return list of data.tables of methylation data
 #' @keywords internal
 #' @noRd
 .load_data_sequential <- function(files.list, min_coverage = 0L) {
@@ -234,67 +246,84 @@
   return(all_samples)
 }
 
-#' Internal function to sequentially load files in parallel using R implementation
-#' @return data.table of methylation data
+#' Internal function to load files in parallel using R implementation
+#'
+#' Falls back to sequential loading only if the cluster itself cannot be set
+#' up (for example SMFnorm is not installed where the workers can load it).
+#' An error from reading a file is not a reason to fall back: it is raised.
+#'
+#' @return list of data.tables of methylation data
 #' @keywords internal
 #' @noRd
 .load_data_parallel <- function(files.list, cores, min_coverage = 0L) {
-  all_samples <- NULL
-
-  if (cores > 1) {
-    # Parallel processing
-    tryCatch({
-      message("Cluster created at: ", Sys.time())
-      cl <- parallel::makeCluster(min(cores, parallel::detectCores() - 1))
-      on.exit(parallel::stopCluster(cl), add = TRUE)
-
-      # Export the loading function
-      parallel::clusterExport(cl = cl, varlist = c("load_single_file_r"), envir = environment())
-
-      parallel::clusterEvalQ(cl, {
-        library(data.table)
-        NULL
-      })
-
-      all_samples <- parallel::parLapply(
-        cl, files.list, 
-        function(f) .load_single_file_r(f, min_coverage = min_coverage)
-        )
-      names(all_samples) <- names(files.list)
-
-    }, error = function(e) {
-      message("Error in parallel processing: ", e$message)
-      message("Falling back to sequential processing...")
-      return(NULL)
-    })
+  n_workers <- max(1L, min(as.integer(cores), length(files.list),
+                           parallel::detectCores() - 1L, na.rm = TRUE))
+  if (n_workers < 2L) {
+    return(.load_data_sequential(files.list, min_coverage = min_coverage))
   }
 
-  # If parallel processing failed, fall back to sequential
-  if (is.null(all_samples)) {
-    all_samples <- .load_data_sequential(files.list, min_coverage = min_coverage)
+  cl <- tryCatch({
+    cl <- parallel::makeCluster(n_workers)
+    ok <- unlist(parallel::clusterEvalQ(
+      cl, requireNamespace("SMFnorm", quietly = TRUE)))
+    if (!all(ok)) {
+      parallel::stopCluster(cl)
+      stop("SMFnorm could not be loaded on the workers")
+    }
+    cl
+  }, error = function(e) {
+    message("Could not start parallel workers (", conditionMessage(e),
+            "). Loading files sequentially...")
+    NULL
+  })
+  if (is.null(cl)) {
+    return(.load_data_sequential(files.list, min_coverage = min_coverage))
   }
+  on.exit(parallel::stopCluster(cl), add = TRUE)
 
+  message(sprintf("Loading %d files on %d workers...", length(files.list),
+                  n_workers))
+  all_samples <- parallel::parLapply(
+    cl, unname(files.list),
+    function(f, min_coverage) {
+      reader <- utils::getFromNamespace(".load_single_file_r", "SMFnorm")
+      reader(f, min_coverage = min_coverage)
+    },
+    min_coverage = min_coverage)
+  names(all_samples) <- names(files.list)
   return(all_samples)
 }
 
-#' Internal function post-process loaded samples
-#' @return data.table, or list of data.tables, of methylation data
+#' Internal function to post-process loaded samples
+#'
+#' Adds the rate and the numeric site identifier. Identifiers are assigned
+#' across all samples together so they are comparable between samples whatever
+#' the chromosome names are (see \code{.chr_levels}).
+#'
+#' @return list of data.tables of methylation data
 #' @keywords internal
 #' @noRd
 .post_process_samples <- function(all_samples, sample_data, files.list) {
-  # Common post-processing for both implementations
-  valid_samples <- !sapply(all_samples, is.null)
-  all_samples <- all_samples[valid_samples]
-
-  if (length(all_samples) == 0) {
-    warning("No files were successfully loaded!")
-    attr(all_samples, "sample_metadata") <- sample_data[0,]
-    return(all_samples)
+  chr_levels <- .chr_levels(all_samples)
+  if (!is.null(chr_levels)) {
+    message(sprintf(paste0("Chromosome names other than 1-22, X, Y and M found ",
+                           "(%d names in total); site identifiers are numbered ",
+                           "from the names in these samples."),
+                    length(chr_levels)))
+  }
+  for (i in seq_along(all_samples)) {
+    df <- all_samples[[i]]
+    df[, rate := ifelse(cov > 0, mc / cov, 0)]
+    .create_uid(df, chr_levels = chr_levels)
+    if (nrow(df) == 0) {
+      warning("Sample '", names(all_samples)[i], "' has no sites",
+              " after loading (check min_coverage).", call. = FALSE)
+    }
   }
 
-  valid_sample_ids <- names(files.list)[valid_samples]
-  filtered_sample_data <- sample_data[match(valid_sample_ids, sample_data$sample_id)]
-  attr(all_samples, "sample_metadata") <- filtered_sample_data
+  attr(all_samples, "sample_metadata") <-
+    sample_data[match(names(files.list), sample_data$sample_id)]
+  attr(all_samples, "chr_levels") <- chr_levels
 
   return(all_samples)
 }
@@ -690,32 +719,77 @@ process_all_samples <- function(data_list, type, out,
 # also significantly faster on numeric keys.
 #
 # Encoding: uid = chr_int * 1e10 + pos * 10 + site_int
-#   - chr_int: 1-22 for autosomes, 23=X, 24=Y, 25=M/MT
+#   - chr_int: 1-22 for autosomes, 23=X, 24=Y, 25=M/MT. When any other name is
+#              present (chrUn_*, *_random, chrI, chr2L, chr23, scaffolds ...)
+#              ALL names are numbered instead by their rank among the names
+#              in the data being compared: standard names first in their usual
+#              order, then the others alphabetically (see .chr_levels).
 #   - pos:     genomic position (up to ~250M for human, fits in 1e10 space)
 #   - site_int: 1-9 for methylation context (GCH=1, HCG=2, GCG=3, etc.)
 #
-# Max possible value: 25e10 + 2.5e9 + 9 ≈ 2.75e10
-# R double precision: exact integers up to 2^53 ≈ 9e15 → no loss of precision
+# R double precision: exact integers up to 2^53 ~ 9e15, so chr_int can reach
+# about 900,000 with no loss of precision.
 # =============================================================================
 
-#' Chromosome name to integer mapping
+#' Fixed codes for the standard chromosome names
+#'
+#' @param chr Character vector of chromosome names.
+#' @return Integer vector: 1-22, X = 23, Y = 24, M/MT = 25 (with or without a
+#'   "chr" prefix), and NA for any other name.
 #' @keywords internal
 #' @noRd
-.chr_to_int <- function(chr) {
-  # Strip "chr" prefix if present
-  chr_clean <- sub("^chr", "", chr, ignore.case = TRUE)
-  
-  # Map to integer
-  result <- integer(length(chr_clean))
-  result[chr_clean == "X"] <- 23L
-  result[chr_clean == "Y"] <- 24L
-  result[chr_clean %in% c("M", "MT")] <- 25L
-  
-  # Numeric chromosomes
-  numeric_idx <- !chr_clean %in% c("X", "Y", "M", "MT")
-  result[numeric_idx] <- as.integer(chr_clean[numeric_idx])
-  
-  return(result)
+.standard_chr_code <- function(chr) {
+  u <- unique(as.character(chr))
+  clean <- sub("^chr", "", u, ignore.case = TRUE)
+  code <- rep(NA_integer_, length(u))
+  autosome <- clean %in% as.character(1:22)
+  code[autosome] <- as.integer(clean[autosome])
+  code[clean == "X"] <- 23L
+  code[clean == "Y"] <- 24L
+  code[clean %in% c("M", "MT")] <- 25L
+  code[match(as.character(chr), u)]
+}
+
+#' Chromosome names needing their own numbering
+#'
+#' @param x A table with a \code{chr} column, or a list of such tables.
+#' @return NULL when every chromosome name is standard (the fixed codes are
+#'   used); otherwise the unique names across all tables (standard names first
+#'   in their usual order, then the others alphabetically), whose ranks are
+#'   used as codes. Identifiers built from the same levels are comparable.
+#' @keywords internal
+#' @noRd
+.chr_levels <- function(x) {
+  if (is.data.frame(x)) x <- list(x)
+  names_found <- unique(unlist(lapply(x, function(dt) unique(as.character(dt$chr))),
+                               use.names = FALSE))
+  code <- .standard_chr_code(names_found)
+  if (!anyNA(code)) return(NULL)
+  # Standard names first, in their usual order, then the rest alphabetically.
+  names_found[order(code, names_found, na.last = TRUE, method = "radix")]
+}
+
+#' Chromosome name to integer mapping
+#'
+#' @param chr Character vector of chromosome names.
+#' @param chr_levels NULL for the fixed codes of the standard names, or the
+#'   names to number by rank (from \code{.chr_levels}). When NULL and \code{chr}
+#'   holds a non-standard name, the names in \code{chr} itself are used.
+#' @keywords internal
+#' @noRd
+.chr_to_int <- function(chr, chr_levels = NULL) {
+  if (is.null(chr_levels)) {
+    code <- .standard_chr_code(chr)
+    if (!anyNA(code)) return(code)
+    chr_levels <- .chr_levels(list(list(chr = chr)))
+  }
+  code <- match(as.character(chr), chr_levels)
+  if (anyNA(code)) {
+    stop("Chromosome name(s) not in chr_levels: ",
+         paste(utils::head(unique(chr[is.na(code)]), 5), collapse = ", "),
+         call. = FALSE)
+  }
+  code
 }
 
 #' Site context to integer mapping
@@ -747,16 +821,22 @@ process_all_samples <- function(data_list, type, out,
 #' @return If \code{in_place = TRUE}, returns \code{dt} invisibly (modified by reference).
 #'   If \code{in_place = FALSE}, returns a numeric vector of uid values.
 #'
+#' @param chr_levels Chromosome numbering to use, from \code{.chr_levels} on
+#'   every table whose identifiers will be compared. NULL (default) uses the
+#'   fixed codes when all names are standard, else the names in \code{dt}.
+#'
 #' @details The encoding is: \code{uid = chr_int * 1e10 + pos * 10 + site_int}, where
-#'   chr_int maps chromosomes to integers (1-22, X=23, Y=24, M=25) and site_int
-#'   maps methylation contexts to integers (GCH=1, HCG=2, etc.). This fits within
-#'   R's double-precision integer range (exact up to 2^53) with no loss of precision.
+#'   chr_int maps chromosomes to integers (1-22, X=23, Y=24, M=25, or ranks of
+#'   \code{chr_levels}) and site_int maps methylation contexts to integers
+#'   (GCH=1, HCG=2, etc.). This fits within R's double-precision integer range
+#'   (exact up to 2^53) with no loss of precision.
 #'
 #' @keywords internal
 #' @noRd
-.create_uid <- function(dt, in_place = TRUE) {
-  uid_vec <- .chr_to_int(dt$chr) * 1e10 + dt$pos * 10 + .site_to_int(dt$site)
-  
+.create_uid <- function(dt, in_place = TRUE, chr_levels = NULL) {
+  uid_vec <- .chr_to_int(dt$chr, chr_levels) * 1e10 + dt$pos * 10 +
+    .site_to_int(dt$site)
+
   if (in_place) {
     dt[, uid := uid_vec]
     return(invisible(dt))

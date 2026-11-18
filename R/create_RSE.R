@@ -48,14 +48,15 @@ create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE
     stop("Missing required columns: ", paste(setdiff(required_cols, names(first_df)), collapse = ", "))
   }
   
-  meta <- as.data.table(first_df)[, ..key_cols]
-  
-  # Create uid if not present, for fast alignment
-  if (!"uid" %in% names(meta)) {
-    .create_uid(meta)
-  }
+  # One chromosome numbering for every sample, so identifiers are comparable
+  # whatever the chromosome names are. Identifiers are recomputed here rather
+  # than taken from an existing uid column, and no input table is modified.
+  chr_levels <- .chr_levels(unlist(lol, recursive = FALSE))
+
+  meta <- data.table::copy(as.data.table(first_df)[, ..key_cols])
+  meta[, uid := .create_uid(meta, in_place = FALSE, chr_levels = chr_levels)]
   setkey(meta, uid)
-  
+
   # Generate string uniqueID for GRanges metadata and matrix rownames
   .create_string_uid(meta)
   
@@ -89,20 +90,15 @@ create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE
     curr_rep_name <- iteration_names[i]
     if (verbose) message("   -> Processing: ", curr_rep_name)
     
-    dt <- as.data.table(flat_reps[[curr_rep_name]])
-    
-    # Ensure uid exists
-    if (!"uid" %in% names(dt)) {
-      .create_uid(dt)
-    }
-    setkey(dt, uid)
-    
-    # Fast numeric key join
-    aligned_dt <- dt[meta[, .(uid)]]
-    
-    cov_matrix[, i]  <- as.numeric(aligned_dt$cov)
-    rate_matrix[, i] <- as.numeric(aligned_dt$rate)
-    
+    dt <- flat_reps[[curr_rep_name]]
+
+    # Align to the master sites by identifier, without touching the input
+    idx <- match(meta$uid,
+                 .create_uid(dt, in_place = FALSE, chr_levels = chr_levels))
+
+    cov_matrix[, i]  <- as.numeric(dt$cov[idx])
+    rate_matrix[, i] <- as.numeric(dt$rate[idx])
+
     flat_reps[[curr_rep_name]] <- NULL
   }
   

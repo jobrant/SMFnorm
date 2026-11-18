@@ -46,3 +46,11 @@ single data.table if single_file is provided.
 \description{
 Load methylation data from files based on a sample sheet.
 }
+\details{
+Files are tab-separated (optionally gzipped) with columns chr,
+pos, strand, site, mc, cov; further columns are ignored. A first line that
+is not a record is treated as a header. Loading stops with an error if a
+file named in the sample sheet is missing, is truncated, has no records,
+or contains a line that is not a valid record. Any chromosome names are
+accepted.
+}
