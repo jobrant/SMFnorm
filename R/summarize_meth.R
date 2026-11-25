@@ -31,7 +31,10 @@ summarize_meth <- function(meth_data, show_site_types = TRUE) {
   }
 
   # Detect structure: flat (sample list) vs nested (group -> sample)
-  is_nested <- all(vapply(meth_data, is.list, logical(1)))
+  # (a data frame is itself a list, so test for it explicitly)
+  is_nested <- all(vapply(meth_data,
+                          function(x) is.list(x) && !is.data.frame(x),
+                          logical(1)))
 
   # Collect metadata if available
   sample_metadata <- attr(meth_data, "sample_metadata")

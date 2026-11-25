@@ -49,22 +49,11 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// testCpp
-std::string testCpp();
-RcppExport SEXP _SMFnorm_testCpp() {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    rcpp_result_gen = Rcpp::wrap(testCpp());
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SMFnorm_createBedgraphCpp", (DL_FUNC) &_SMFnorm_createBedgraphCpp, 5},
     {"_SMFnorm_readMethylationFile", (DL_FUNC) &_SMFnorm_readMethylationFile, 2},
     {"_SMFnorm_readMethylationFiles", (DL_FUNC) &_SMFnorm_readMethylationFiles, 2},
-    {"_SMFnorm_testCpp", (DL_FUNC) &_SMFnorm_testCpp, 0},
     {NULL, NULL, 0}
 };
 

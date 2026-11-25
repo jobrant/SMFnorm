@@ -443,7 +443,7 @@
                                              max_quantiles = 50,
                                              diagnostics = TRUE) {
 
-  if(diagnostics) cat("Calculating average rates...\n")
+  if(diagnostics) message("Calculating average rates...")
   
   # All samples must hold the same sites in the same order
   .check_sites_aligned(sample_list)
@@ -461,7 +461,7 @@
   # Dynamic quantile calculation
   n_sites <- length(avg_rates)
   n_quantiles <- as.integer(max(5, min(n_sites/sites_per_quantile, max_quantiles)))
-  if(diagnostics) cat(sprintf("Using %d quantiles for %d sites\n", n_quantiles, n_sites))
+  if(diagnostics) message(sprintf("Using %d quantiles for %d sites", n_quantiles, n_sites))
 
   # Create quantiles
   probs <- seq(0, 1, length.out = n_quantiles + 1)
@@ -487,8 +487,11 @@
 
   # Initialize result list and progress bar
   result <- sample_list
-  if(diagnostics) {
-    cat("Normalizing by quantile...\n")
+  # Messages go to stderr; the progress bar is drawn only in an interactive
+  # session, so logs and rendered documents stay clean.
+  show_progress <- diagnostics && interactive()
+  if(diagnostics) message("Normalizing by quantile...")
+  if(show_progress) {
     pb <- txtProgressBar(min = 0, max = length(levels(rate_quantiles)), style = 3)
   }
 
@@ -499,8 +502,8 @@
 
     # Check for empty quantiles
     if(length(sites_in_quantile) == 0) {
-      if(diagnostics) cat(sprintf("Warning: Quantile %s is empty, skipping\n", quant))
-      if(diagnostics) setTxtProgressBar(pb, i)
+      if(diagnostics) message(sprintf("Quantile %s is empty, skipping", quant))
+      if(show_progress) setTxtProgressBar(pb, i)
       next
     }
 
@@ -508,13 +511,13 @@
     max_sites <- min(sapply(result, nrow))
     if(any(sites_in_quantile > max_sites)) {
       problem_sites <- sites_in_quantile[sites_in_quantile > max_sites]
-      if(diagnostics) cat(sprintf("Warning: Removing %d out-of-bounds sites\n",
-                                  length(problem_sites)))
+      if(diagnostics) message(sprintf("Removing %d out-of-bounds sites",
+                                      length(problem_sites)))
       sites_in_quantile <- sites_in_quantile[sites_in_quantile <= max_sites]
 
       # Skip if no valid sites remain
       if(length(sites_in_quantile) == 0) {
-        if(diagnostics) setTxtProgressBar(pb, i)
+        if(show_progress) setTxtProgressBar(pb, i)
         next
       }
     }
@@ -556,13 +559,11 @@
       return(dt)
     })
 
-    if(diagnostics) setTxtProgressBar(pb, i)
+    if(show_progress) setTxtProgressBar(pb, i)
   }
 
-  if(diagnostics) {
-    close(pb)
-    cat("\nNormalization complete!\n")
-  }
+  if(show_progress) close(pb)
+  if(diagnostics) message("Normalization complete!")
 
   return(result)
 }
@@ -586,20 +587,7 @@ process_single_file <- function(file_path, type, out, sample_name = NULL,
   }
 
   # Load and process file
-  data <- load_data(single_file = file_path)
-
-  # Ensure required columns
-  required_cols <- c("chr", "pos", "rate", "cov")
-  if (!all(required_cols %in% names(data))) {
-    stop("Loaded data missing required columns: ",
-         paste(setdiff(required_cols, names(data)), collapse = ", "))
-  }
-
-  # Ensure correct column types
-  data$chr <- as.character(data$chr)
-  data$pos <- as.integer(data$pos)
-  data$rate <- as.numeric(data$rate)
-  data$cov <- as.integer(data$cov)
+  data <- load_single_file(file_path)
 
   process_single_sample(data, type, out, sample_name = sample_name, .options = .options)
 }
@@ -617,6 +605,24 @@ process_single_file <- function(file_path, type, out, sample_name = NULL,
 process_single_sample <- function(sample_df, type, out, group_name = NULL,
                                   sample_name = NULL, .options = list(use_cpp_impl = TRUE)) {
 
+  value_col <- if (type == "meth") "rate" else "cov"
+  required_cols <- c("chr", "pos", value_col)
+  if (!all(required_cols %in% names(sample_df))) {
+    stop("Input data frame missing required columns: ",
+         paste(setdiff(required_cols, names(sample_df)), collapse = ", "))
+  }
+  if (is.null(sample_name)) sample_name <- "sample"
+
+  # Only the columns written, with UCSC-style chromosome names. Both writers
+  # used to put "chr" in front of every name, so "chr1" became "chrchr1".
+  out_df <- data.frame(
+    chr = .ucsc_chr_names(sample_df[["chr"]]),
+    pos = as.integer(sample_df[["pos"]]),
+    stringsAsFactors = FALSE
+  )
+  out_df[[value_col]] <- as.numeric(sample_df[[value_col]])
+  sample_df <- out_df
+
   # Select implementation based on options
   if (.options$use_cpp_impl) {
     return(process_single_sample_cpp(sample_df, type, out, group_name, sample_name))
@@ -628,19 +634,6 @@ process_single_sample <- function(sample_df, type, out, group_name = NULL,
 #' Process a single sample using C++ implementation
 #' @keywords internal
 process_single_sample_cpp <- function(sample_df, type, out, group_name = NULL, sample_name = NULL) {
-  # Validate input data frame
-  required_cols <- c("chr", "pos", "rate", "cov")
-  if (!all(required_cols %in% names(sample_df))) {
-    stop("Input data frame missing required columns: ",
-         paste(setdiff(required_cols, names(sample_df)), collapse = ", "))
-  }
-
-  # Ensure correct types
-  sample_df$chr <- as.character(sample_df$chr)
-  sample_df$pos <- as.integer(sample_df$pos)
-  sample_df$rate <- as.numeric(sample_df$rate)
-  sample_df$cov <- as.integer(sample_df$cov)
-
   tryCatch({
     out_file <- createBedgraphCpp(sample_df, type, out, group_name, sample_name)
     if (!file.exists(out_file)) {
@@ -658,19 +651,14 @@ process_single_sample_cpp <- function(sample_df, type, out, group_name = NULL, s
 process_single_sample_r <- function(sample_df, type, out, group_name = NULL, sample_name = NULL) {
   # Convert to bedGraph format (your original R code)
   bg_data <- data.table::data.table(
-    chr = paste0("chr", sample_df$chr),
-    start = sample_df$pos - 1,  # BED format is 0-based
+    chr = sample_df$chr,
+    start = sample_df$pos - 1L,  # BED format is 0-based
     end = sample_df$pos,
     value = if(type == "meth") sample_df$rate else sample_df$cov
   )
 
   # Create output filename
-  if(is.null(sample_name)) {
-    file_prefix <- "sample"
-    sample_name <- basename(tempfile())
-  } else {
-    file_prefix <- if(is.null(group_name)) sample_name else paste(group_name, sample_name, sep="_")
-  }
+  file_prefix <- if(is.null(group_name)) sample_name else paste(group_name, sample_name, sep="_")
 
   out_file <- file.path(out, paste0(file_prefix, "_", type, ".bedGraph"))
 
@@ -682,6 +670,25 @@ process_single_sample_r <- function(sample_df, type, out, group_name = NULL, sam
   )
 
   return(out_file)
+}
+
+
+#' UCSC-style chromosome names
+#'
+#' Adds the "chr" prefix when no name has it (and turns "MT" into "chrM");
+#' names that already carry the prefix are returned unchanged. The same rule
+#' as \code{.harmonize_chr_names()} uses for bigWig export.
+#'
+#' @param chr Chromosome names.
+#' @return Character vector.
+#' @keywords internal
+#' @noRd
+.ucsc_chr_names <- function(chr) {
+  chr <- as.character(chr)
+  if (any(startsWith(unique(chr), "chr"))) return(chr)
+  chr <- paste0("chr", chr)
+  chr[chr == "chrMT"] <- "chrM"
+  chr
 }
 
 

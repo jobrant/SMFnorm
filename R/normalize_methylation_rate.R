@@ -5,8 +5,10 @@
 #'
 #' @param data_list List of methylation data by group, with the same sites in
 #'   the same row order in every sample
-#' @param group_names Optional character vector of group names. If NULL (default),
-#'   will be extracted from the metadata attached to data_list.
+#' @param group_names Optional character vector naming the groups to
+#'   normalize. Only these groups are used and returned, in the order given.
+#'   If NULL (default), all groups in \code{data_list} are used. Naming a group
+#'   that is not in \code{data_list} is an error.
 #' @param within_groups Logical indicating whether to normalize within groups (default = TRUE)
 #' @param between_groups Logical indicating whether to normalize between groups (default = TRUE)
 #' @param within_alpha Numeric between 0 and 1. Shrinkage of site-level
@@ -72,7 +74,8 @@
 #'   is issued when the groups' mean rates differ by more than 5\% of their
 #'   average.
 #'
-#' @return List of lists containing normalized methylation data
+#' @return List of lists containing normalized methylation data, with the
+#'   group and sample names of the input (or the groups in \code{group_names})
 #'
 #' @export
 normalize_methylation_rates <- function(data_list,
@@ -85,31 +88,9 @@ normalize_methylation_rates <- function(data_list,
                                         max_quantiles = 50,
                                         diagnostics = TRUE) {
 
-  # Extract group names from metadata if not provided
-  if (is.null(group_names)) {
-    # Check for metadata attribute
-    if (is.list(data_list) && !is.null(attr(data_list, "sample_metadata"))) {
-      sample_metadata <- attr(data_list, "sample_metadata")
-      group_names <- unique(sample_metadata$group_id)
-      if (diagnostics) {
-        message("Using group names extracted from metadata: ",
-                paste(group_names, collapse = ", "))
-      }
-    } else if (is.list(data_list) && all(names(data_list) != "")) {
-      # If no metadata but data_list has names, use those as group names
-      group_names <- names(data_list)
-      if (diagnostics) {
-        message("Using list names as group names: ",
-                paste(group_names, collapse = ", "))
-      }
-    } else {
-      stop("No group_names provided and unable to extract from metadata")
-    }
-  }
-
-  # Input validation
-  if (!is.list(data_list)) stop("data_list must be a list")
-  if (!all(sapply(data_list, is.list))) stop("data_list must be a list of lists")
+  # Input validation, and the groups to work on. `group_names` used to be
+  # read here and then not used.
+  data_list <- .select_groups(data_list, group_names, diagnostics)
 
   result <- data_list
 
@@ -124,9 +105,9 @@ normalize_methylation_rates <- function(data_list,
 
   # Step 1: Within-group normalization
   if(within_groups) {
-    if(diagnostics) cat("\n=== Performing within-group normalization ===\n")
+    if(diagnostics) message("=== Performing within-group normalization ===")
     result <- lapply(names(result), function(group) {
-      if(diagnostics) cat(sprintf("\nProcessing group: %s\n", group))
+      if(diagnostics) message(sprintf("Processing group: %s", group))
       .normalize_methylation_within_set(
         result[[group]],
         alpha = within_alpha,
@@ -140,7 +121,7 @@ normalize_methylation_rates <- function(data_list,
 
   # Step 2: Between-group normalization
   if(between_groups) {
-    if(diagnostics) cat("\n=== Performing between-group normalization ===\n")
+    if(diagnostics) message("=== Performing between-group normalization ===")
     # Flatten data for between-group normalization
     all_samples <- unlist(result, recursive = FALSE)
 

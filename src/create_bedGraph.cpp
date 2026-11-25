@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <iomanip>
+#include <algorithm>
 using namespace Rcpp;
 
 // [[Rcpp::export]]
@@ -48,7 +49,7 @@ String createBedgraphCpp(DataFrame sample_df,
       file_prefix = as<std::string>(group_name) + "_" + file_prefix;
     }
   } else {
-    file_prefix = "sample_" + std::to_string(Rcpp::runif(1, 0, 1000000)[0]);
+    file_prefix = "sample";
   }
   
   std::string output_file = out_path + "/" + file_prefix + "_" + type + ".bedGraph";
@@ -60,9 +61,11 @@ String createBedgraphCpp(DataFrame sample_df,
   }
   
   // Write bedGraph data
-  outfile << std::fixed << std::setprecision(6); // Match R's precision
+  // Rates with six decimals; coverage as whole reads
+  const bool as_count = (type == "cov");
+  outfile << std::fixed << std::setprecision(as_count ? 0 : 6);
   for (int i = 0; i < n; ++i) {
-    outfile << "chr" << as<std::string>(chr_vec[i]) << "\t"
+    outfile << as<std::string>(chr_vec[i]) << "\t"
             << pos_vec[i] - 1 << "\t" // BED format is 0-based
             << pos_vec[i] << "\t"
             << value_vec[i] << "\n";

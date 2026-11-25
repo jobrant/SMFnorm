@@ -12,13 +12,17 @@
 #'   \code{chr, pos, strand, site, uniqueID, cov}, and \code{rate}.
 #' }
 #' @param groups Groups to include in the summarized experiment object. If not specified, all groups are retained.
+#'   Naming a group that is not in \code{lol} is an error.
 #' @param exp_metadata Any additional list containing experiment-level metadata to be stored in the
 #' \code{metadata} slot of the SummarizedExperiment.
 #' @param verbose Logical. If TRUE (default), prints progress messages during processing.
 #'
 #' @return A \code{RangedSummarizedExperiment} object with two assays: \code{coverage}
 #' and \code{rate}. Site-level genomic metadata is preserved in the
-#' \code{rowRanges} slot as a \code{GRanges} object.
+#' \code{rowRanges} slot as a \code{GRanges} object. Columns are named
+#' \code{<group>_<sample>}; \code{colData} holds \code{group} and
+#' \code{sample} exactly as they are named in \code{lol}, so either may
+#' contain underscores or dots.
 #'
 #' @export
 create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE) {
@@ -26,13 +30,32 @@ create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE
   if (!is.list(lol) || is.null(names(lol))) {
     stop("Input 'lol' must be a named list.")
   }
-  if (!all(sapply(lol, function(x) is.list(x) && !is.null(names(x))))) {
-    stop("All elements in 'lol' must be named lists.")
+  if (!all(sapply(lol, function(x) is.list(x) && !is.data.frame(x) &&
+                                     !is.null(names(x))))) {
+    stop("All elements in 'lol' must be named lists of samples (groups, each ",
+         "holding its samples). Use split_by_groups() on the output of load_data().")
   }
   
   if(!is.null(groups)){
+    missing_groups <- setdiff(groups, names(lol))
+    if (length(missing_groups) > 0) {
+      stop("Group(s) not found in 'lol': ",
+           paste(missing_groups, collapse = ", "),
+           ". Available groups: ", paste(names(lol), collapse = ", "))
+    }
     if (verbose) message("Subsetting groups...")
     lol <- lol[groups]
+  }
+
+  # Group and sample of every column, taken from the list structure. They used
+  # to be recovered by splitting the column name at its first underscore, which
+  # put a group called "WT_treated" in group "WT".
+  col_groups  <- rep(names(lol), lengths(lol))
+  col_samples <- unlist(lapply(lol, names), use.names = FALSE)
+  col_ids <- paste(col_groups, col_samples, sep = "_")
+  if (anyDuplicated(col_ids)) {
+    stop("Group and sample names do not give unique column names: ",
+         paste(unique(col_ids[duplicated(col_ids)]), collapse = ", "))
   }
   
   # ── PART 1: Metadata Extraction ──
@@ -72,8 +95,8 @@ create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE
   # ── PART 2: Flattening and Matrix Pre-allocation ──
   if (verbose) message("Flattening structure and pre-allocating matrices...")
   
-  flat_reps <- unlist(lol, recursive = FALSE)
-  rep_names <- names(flat_reps)
+  flat_reps <- unlist(unname(lol), recursive = FALSE)
+  names(flat_reps) <- col_ids
   
   num_rows <- nrow(meta)
   num_reps <- length(flat_reps)
@@ -105,19 +128,16 @@ create_RSE <- function(lol, groups = NULL, exp_metadata = list(), verbose = TRUE
   # ── PART 4: Column Metadata ──
   if (verbose) message("Building colData...")
   
-  clean_names <- gsub("\\.", "_", rep_names)
-  colnames(cov_matrix) <- colnames(rate_matrix) <- clean_names
+  colnames(cov_matrix) <- colnames(rate_matrix) <- col_ids
   rownames(cov_matrix) <- rownames(rate_matrix) <- meta$uniqueID  # string for rownames
-  
-  name_split <- stringr::str_split(clean_names, pattern = "_", n = 2, simplify = TRUE)
-  
+
   col_metadata <- data.frame(
-    group      = as.factor(name_split[, 1]),
-    sample     = name_split[, 2],
-    row.names  = clean_names,
+    group      = factor(col_groups, levels = names(lol)),
+    sample     = col_samples,
+    row.names  = col_ids,
     stringsAsFactors = FALSE
   )
-  
+
   # ── PART 5: Assembly ──
   if (verbose) message("Assembling RangedSummarizedExperiment...")
   

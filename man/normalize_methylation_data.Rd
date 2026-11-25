@@ -21,8 +21,11 @@ normalize_methylation_data(
 \arguments{
 \item{data_list}{List of methylation data by group}
 
-\item{group_names}{Optional character vector of group names. If NULL (default),
-will be extracted from the metadata attached to data_list.}
+\item{group_names}{Optional character vector naming the groups to
+normalize. Only these groups are used and returned, in the order given;
+the others play no part in the coverage filter or the between-group step.
+If NULL (default), all groups in \code{data_list} are used. Naming a group
+that is not in \code{data_list} is an error.}
 
 \item{normalize_rates}{Logical, whether to perform rate normalization}
 
@@ -50,7 +53,8 @@ the same sites. Use 0 to skip the filter.}
 }
 \value{
 Normalized methylation data list with the same group and sample names
-as the input, and its \code{sample_metadata} attribute if it had one.
+as the input (or the groups in \code{group_names}), and its
+\code{sample_metadata} attribute if it had one.
 }
 \description{
 Filters sites by coverage and normalizes methylation rates.
@@ -77,9 +81,12 @@ All samples must contain the same sites in the same row order, as returned by
 \examples{
 \dontrun{
 # Basic usage with defaults
+normalized_data <- normalize_methylation_data(data_list = split_data)
+
+# Two of the groups only
 normalized_data <- normalize_methylation_data(
   data_list = split_data,
-  group_names = group_names
+  group_names = c("Control", "Treated")
 )
 
 # Correct efficiency within groups only, e.g. when the conditions are
@@ -87,7 +94,6 @@ normalized_data <- normalize_methylation_data(
 # that difference along with any efficiency difference
 normalized_data <- normalize_methylation_data(
   data_list = split_data,
-  group_names = group_names,
   rate_between_groups = FALSE
 )
 }

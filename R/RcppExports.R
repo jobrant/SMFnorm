@@ -13,7 +13,3 @@ readMethylationFiles <- function(filenames, min_coverage = 0L) {
     .Call(`_SMFnorm_readMethylationFiles`, filenames, min_coverage)
 }
 
-testCpp <- function() {
-    .Call(`_SMFnorm_testCpp`)
-}
-

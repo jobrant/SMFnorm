@@ -15,12 +15,14 @@ create_bedgraph(
 )
 }
 \arguments{
-\item{data}{Input data, can be either:
-\enumerate{
-\item A list of lists containing normalized samples
-\item A single data frame containing one sample
-\item A character string specifying path to input file
-}}
+\item{data}{Input data, one of:
+1. A list of groups, each a named list of samples (as returned by
+\code{\link{split_by_groups}} or
+\code{\link{normalize_methylation_data}})
+2. A named list of samples (one group, or the flat list returned by
+\code{\link{load_data}})
+3. A single data frame containing one sample
+4. A character string specifying path to input file}
 
 \item{type}{Character string for type of value to include in bedGraph.
 Should be one of "cov" or "meth" (for coverage bedGraph or methylation rate bedGraph, respectively.)}
@@ -30,15 +32,19 @@ Ignored if input is a single sample or file.}
 
 \item{out}{Directory to write output bedGraph files to. Default is current working directory.}
 
-\item{group_name}{Name of the group (optional)}
+\item{group_name}{Name of the group (optional), prefixed to the file name.
+Used for a single sample or a list of samples; a list of groups uses
+its own group names.}
 
-\item{sample_name}{Name to use for output file (optional)}
+\item{sample_name}{Name to use for the output file of a single sample or
+file (optional). Defaults to "sample" for a data frame and to the
+file name without its extension for a file. Lists use their names.}
 
-\item{use_cpp}{Logical. Should function be performed on all files in object.
-Default is TRUE. Will fall back to R implementation if C++ is not available.}
+\item{use_cpp}{Logical. Use the C++ writer. Default is TRUE. Falls back to
+the R implementation if C++ is not available.}
 }
 \value{
-Invisibly returns list of created bedGraph file paths
+Invisibly, a character vector of the bedGraph file paths created.
 }
 \description{
 Converts normalized data into bedGraph files
@@ -50,4 +56,10 @@ Converts methylation data to bedGraph format. Can handle multiple input types:
 \item If given a single sample data frame, processes just that sample
 \item If given a file path, loads and processes that file
 }
+
+Files are named \code{<group>_<sample>_<type>.bedGraph} (without the group
+when there is none). Chromosome names are written in UCSC style, as in
+\code{\link{create_bigwig}}: when no name starts with "chr" the prefix is
+added and "MT" becomes "chrM"; names that already have the prefix are
+written unchanged.
 }

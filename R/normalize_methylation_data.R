@@ -3,8 +3,11 @@
 #' Filters sites by coverage and normalizes methylation rates.
 #'
 #' @param data_list List of methylation data by group
-#' @param group_names Optional character vector of group names. If NULL (default),
-#'   will be extracted from the metadata attached to data_list.
+#' @param group_names Optional character vector naming the groups to
+#'   normalize. Only these groups are used and returned, in the order given;
+#'   the others play no part in the coverage filter or the between-group step.
+#'   If NULL (default), all groups in \code{data_list} are used. Naming a group
+#'   that is not in \code{data_list} is an error.
 #' @param normalize_rates Logical, whether to perform rate normalization
 #' @param rate_within_groups Logical, normalize rates within groups
 #' @param rate_between_groups Logical, normalize rates between groups
@@ -41,14 +44,18 @@
 #' \code{\link{find_shared_sites}}; the function stops if they do not.
 #'
 #' @return Normalized methylation data list with the same group and sample names
-#'   as the input, and its \code{sample_metadata} attribute if it had one.
+#'   as the input (or the groups in \code{group_names}), and its
+#'   \code{sample_metadata} attribute if it had one.
 #'
 #' @examples
 #' \dontrun{
 #' # Basic usage with defaults
+#' normalized_data <- normalize_methylation_data(data_list = split_data)
+#'
+#' # Two of the groups only
 #' normalized_data <- normalize_methylation_data(
 #'   data_list = split_data,
-#'   group_names = group_names
+#'   group_names = c("Control", "Treated")
 #' )
 #'
 #' # Correct efficiency within groups only, e.g. when the conditions are
@@ -56,7 +63,6 @@
 #' # that difference along with any efficiency difference
 #' normalized_data <- normalize_methylation_data(
 #'   data_list = split_data,
-#'   group_names = group_names,
 #'   rate_between_groups = FALSE
 #' )
 #' }
@@ -78,13 +84,10 @@ normalize_methylation_data <- function(data_list,
                                        sites_per_quantile = 1000,
                                        diagnostics = FALSE) {
 
-  group_names <- extract_group_names(data_list, diagnostics)
-
-  # Input validation
-  if (!is.list(data_list)) stop("data_list must be a list")
-  if (!all(vapply(data_list, is.list, logical(1)))) {
-    stop("data_list must be a list of lists")
-  }
+  # Input validation, and the groups to work on. `group_names` used to be
+  # overwritten here and had no effect.
+  data_list <- .select_groups(data_list, group_names,
+                             diagnostics = diagnostics && !normalize_rates)
   sample_metadata <- attr(data_list, "sample_metadata")
   group_ids <- names(data_list)
 
@@ -117,7 +120,6 @@ normalize_methylation_data <- function(data_list,
   # Step 1: Rate normalization
   if (normalize_rates) {
     data_list <- normalize_methylation_rates(data_list,
-                                             group_names = group_names,
                                              within_groups = rate_within_groups,
                                              between_groups = rate_between_groups,
                                              within_alpha = within_alpha,

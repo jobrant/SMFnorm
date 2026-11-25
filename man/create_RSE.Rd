@@ -15,7 +15,8 @@ create_RSE(lol, groups = NULL, exp_metadata = list(), verbose = TRUE)
 \code{chr, pos, strand, site, uniqueID, cov}, and \code{rate}.
 }}
 
-\item{groups}{Groups to include in the summarized experiment object. If not specified, all groups are retained.}
+\item{groups}{Groups to include in the summarized experiment object. If not specified, all groups are retained.
+Naming a group that is not in \code{lol} is an error.}
 
 \item{exp_metadata}{Any additional list containing experiment-level metadata to be stored in the
 \code{metadata} slot of the SummarizedExperiment.}
@@ -25,7 +26,10 @@ create_RSE(lol, groups = NULL, exp_metadata = list(), verbose = TRUE)
 \value{
 A \code{RangedSummarizedExperiment} object with two assays: \code{coverage}
 and \code{rate}. Site-level genomic metadata is preserved in the
-\code{rowRanges} slot as a \code{GRanges} object.
+\code{rowRanges} slot as a \code{GRanges} object. Columns are named
+\code{<group>_<sample>}; \code{colData} holds \code{group} and
+\code{sample} exactly as they are named in \code{lol}, so either may
+contain underscores or dots.
 }
 \description{
 This function takes a nested named list of methylation data frames and converts them

@@ -20,8 +20,10 @@ normalize_methylation_rates(
 \item{data_list}{List of methylation data by group, with the same sites in
 the same row order in every sample}
 
-\item{group_names}{Optional character vector of group names. If NULL (default),
-will be extracted from the metadata attached to data_list.}
+\item{group_names}{Optional character vector naming the groups to
+normalize. Only these groups are used and returned, in the order given.
+If NULL (default), all groups in \code{data_list} are used. Naming a group
+that is not in \code{data_list} is an error.}
 
 \item{within_groups}{Logical indicating whether to normalize within groups (default = TRUE)}
 
@@ -44,7 +46,8 @@ normalization granularity and statistical power.}
 \item{diagnostics}{Logical indicating whether to print diagnostic information}
 }
 \value{
-List of lists containing normalized methylation data
+List of lists containing normalized methylation data, with the
+group and sample names of the input (or the groups in \code{group_names})
 }
 \description{
 Normalizes methylation rates using quantile-based normalization to account for

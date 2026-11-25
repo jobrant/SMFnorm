@@ -15,10 +15,16 @@ If \code{NULL} (default), all samples are extracted.}
 \item{verbose}{Logical. If \code{TRUE} (default), prints progress messages.}
 }
 \value{
-A doubly-nested named list of \code{data.table} objects.
+A doubly-nested named list of \code{data.table} objects, with groups
+and samples named as they were given to \code{create_RSE}.
 }
 \description{
 This function performs the inverse operation of \code{create_RSE}. It extracts
 genomic coordinates and assay data, then reconstructs a hierarchical list
-based on the groups provided in the \code{Group_SampleName} format.
+from the groups and samples recorded in \code{colData}.
+}
+\details{
+Groups and samples are read from the \code{group} and \code{sample} columns
+of \code{colData}, which \code{create_RSE} writes. If either column is
+absent, the column names are split at their first underscore instead.
 }

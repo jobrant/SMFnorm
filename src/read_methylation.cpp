@@ -175,11 +175,3 @@ List readMethylationFiles(CharacterVector filenames, int min_coverage = 0) {
 
   return results;
 }
-
-// [[Rcpp::export]]
-std::string testCpp() {
-  Rcout << "Test C++ function called successfully\nwhy this so painfull";
-  return "Success";
-}
-
-
