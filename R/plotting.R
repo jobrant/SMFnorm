@@ -1,8 +1,8 @@
 #' @title Visualization Functions for Methylation Data
 #' @description
 #' Functions for visualizing methylation data at various stages of the
-#' normalization workflow. Includes density plots, QQ plots, MA plots,
-#' and PCA/MDS plots.
+#' normalization workflow. Includes density plots, MA plots and PCA/MDS
+#' plots. See \code{\link{plot_efficiency}} for the efficiency curve.
 #' @name plotting
 NULL
 
@@ -70,60 +70,6 @@ plot_density <- function(meth_data,
     theme
   
   return(p)
-}
-
-
-#' QQ Plot for Methylation Rate Comparison
-#'
-#' Creates quantile-quantile plots comparing methylation rates between
-#' pairs of samples within each group. Uses hexagonal binning for large
-#' datasets. When multiple stages are provided, plots are generated for
-#' each stage.
-#'
-#' @inheritParams plot_density
-#' @param bins Number of hexagonal bins for the hex plot. Default is 50.
-#'
-#' @return A ggplot object (or patchwork composite if multiple pairs exist).
-#'
-#' @examples
-#' \dontrun{
-#' plot_qq(split_data)
-#' }
-#'
-#' @export
-plot_qq <- function(meth_data,
-                    stages = NULL,
-                    sample_size = 100000,
-                    bins = 50,
-                    theme = ggplot2::theme_minimal()) {
-  
-  prepared <- .prepare_plot_data(meth_data, stages, sample_size)
-  data <- prepared$data
-  stages <- prepared$stages
-  
-  # Try hexbin first, fall back to simple
-  hex_plots <- tryCatch(
-    .create_qq_hexbin_plot(data, stages, bins, theme),
-    error = function(e) {
-      message("Hexbin QQ plot failed: ", e$message, ". Using simple QQ plot.")
-      NULL
-    }
-  )
-  
-  if (is.null(hex_plots) || length(hex_plots) == 0) {
-    return(.create_simple_qq_plot(data, stages, theme))
-  }
-  
-  if (length(hex_plots) == 1) {
-    return(hex_plots[[1]])
-  }
-  
-  if (requireNamespace("patchwork", quietly = TRUE)) {
-    max_plots <- min(4, length(hex_plots))
-    return(patchwork::wrap_plots(hex_plots[seq_len(max_plots)], ncol = 2))
-  }
-  
-  return(hex_plots[[1]])
 }
 
 
@@ -613,106 +559,6 @@ plot_pca <- function(meth_data,
   }
   
   list(coords = coords, var_explained = var_explained)
-}
-
-
-# --- QQ plot internals (kept from original) ------------------------------
-
-#' Create hexbin QQ plots for all within-group sample pairs
-#' @keywords internal
-#' @noRd
-.create_qq_hexbin_plot <- function(data, stages, bins = 50,
-                                   theme = ggplot2::theme_minimal()) {
-  plot_list <- list()
-  
-  for (stage_name in levels(data$stage)) {
-    stage_data <- data[data$stage == stage_name, ]
-    
-    for (group_name in unique(stage_data$group)) {
-      group_data <- stage_data[stage_data$group == group_name, ]
-      samples <- unique(group_data$sample)
-      
-      if (length(samples) < 2) next
-      
-      pairs <- utils::combn(samples, 2, simplify = FALSE)
-      
-      for (pair in pairs) {
-        d1 <- group_data[group_data$sample == pair[1], ]
-        d2 <- group_data[group_data$sample == pair[2], ]
-        
-        common_rows <- intersect(d1$row_id, d2$row_id)
-        if (length(common_rows) < 10) next
-        
-        plot_df <- data.frame(
-          x = d1$rate[match(common_rows, d1$row_id)],
-          y = d2$rate[match(common_rows, d2$row_id)]
-        )
-        plot_df <- stats::na.omit(plot_df)
-        
-        if (nrow(plot_df) < 10) next
-        if (diff(range(plot_df$x)) <= 0 || diff(range(plot_df$y)) <= 0) next
-        
-        p <- ggplot2::ggplot(plot_df, ggplot2::aes(x = x, y = y)) +
-          ggplot2::geom_hex(bins = bins) +
-          ggplot2::geom_abline(color = "red", linetype = "dashed") +
-          ggplot2::scale_fill_viridis_c(option = "magma") +
-          ggplot2::labs(
-            title = paste(group_name, "-", stage_name),
-            subtitle = paste(pair, collapse = " vs "),
-            x = pair[1],
-            y = pair[2]
-          ) +
-          theme
-        
-        plot_id <- paste(stage_name, group_name,
-                         paste(pair, collapse = "_"), sep = "_")
-        plot_list[[plot_id]] <- p
-      }
-    }
-  }
-  
-  if (length(plot_list) == 0) return(NULL)
-  return(plot_list)
-}
-
-
-#' Simple QQ plot fallback when hexbin fails
-#' @keywords internal
-#' @noRd
-.create_simple_qq_plot <- function(data, stages,
-                                   theme = ggplot2::theme_minimal()) {
-  avg_data <- stats::aggregate(rate ~ group + stage, data, mean)
-  
-  if (length(stages) >= 2) {
-    stage1 <- stages[1]
-    stage2 <- stages[2]
-    comp_data <- reshape2::dcast(avg_data, group ~ stage, value.var = "rate")
-    
-    p <- ggplot2::ggplot(comp_data,
-                         ggplot2::aes(x = .data[[stage1]], y = .data[[stage2]])) +
-      ggplot2::geom_point(ggplot2::aes(color = group), size = 3) +
-      ggplot2::geom_abline(color = "red", linetype = "dashed") +
-      ggplot2::labs(
-        title = paste("Comparison:", stage1, "vs", stage2),
-        x = paste("Rate in", stage1),
-        y = paste("Rate in", stage2)
-      ) +
-      theme
-  } else {
-    p <- ggplot2::ggplot(avg_data,
-                         ggplot2::aes(x = group, y = rate, fill = group)) +
-      ggplot2::geom_col() +
-      ggplot2::facet_wrap(~stage) +
-      ggplot2::labs(
-        title = "Average Methylation Rate by Group",
-        x = "Group",
-        y = "Average Rate"
-      ) +
-      theme +
-      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
-  }
-  
-  return(p)
 }
 
 

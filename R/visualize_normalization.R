@@ -2,8 +2,8 @@
 #'
 #' Generates a multi-page PDF report comparing methylation data across
 #' normalization stages. This is a convenience wrapper around the
-#' individual plot functions (\code{\link{plot_density}},
-#' \code{\link{plot_qq}}, \code{\link{plot_ma}}, \code{\link{plot_pca}}).
+#' individual plot functions (\code{\link{plot_efficiency}},
+#' \code{\link{plot_density}}, \code{\link{plot_ma}}, \code{\link{plot_pca}}).
 #'
 #' @param data_list Named list where each element contains methylation data
 #'   at a different normalization stage (e.g.,
@@ -11,15 +11,16 @@
 #' @param stages Character vector of stage names corresponding to
 #'   \code{data_list} elements. Default uses \code{names(data_list)}.
 #' @param plots Character vector of plot types to include. Options are
-#'   \code{"density"}, \code{"qq"}, \code{"ma"}, and \code{"pca"}.
-#'   Default is \code{c("density", "qq")}.
-#' @param sample_size Number of sites to randomly sample for visualization.
-#'   Default is 100000. Use \code{NULL} for all sites.
+#'   \code{"efficiency"}, \code{"density"}, \code{"ma"}, and \code{"pca"}.
+#'   Default is \code{c("efficiency", "density")}.
+#' @param sample_size Number of sites to randomly sample for the density and
+#'   MA plots. Default is 100000. Use \code{NULL} for all sites. The
+#'   efficiency curve always uses all sites.
 #' @param output_file File path to save the combined PDF report.
 #'   If \code{NULL}, no file is saved.
-#' @param output_dir Directory for individual plot reports.
-#'   Defaults to the directory of \code{output_file}, or the working
-#'   directory if \code{output_file} is also \code{NULL}.
+#' @param output_dir Directory for individual plot reports (one PDF per
+#'   plot). Defaults to the directory of \code{output_file}. If both are
+#'   \code{NULL}, no files are written and the plots are only returned.
 #' @param theme ggplot2 theme to apply. Default is
 #'   \code{\link[ggplot2]{theme_minimal}}.
 #'
@@ -35,18 +36,18 @@
 #'     "Before" = split_data,
 #'     "After"  = normalized_data
 #'   ),
-#'   plots = c("density", "ma", "pca"),
+#'   plots = c("efficiency", "density", "pca"),
 #'   output_file = "normalization_report.pdf"
 #' )
 #' }
 #'
-#' @seealso \code{\link{plot_density}}, \code{\link{plot_qq}},
+#' @seealso \code{\link{plot_efficiency}}, \code{\link{plot_density}},
 #'   \code{\link{plot_ma}}, \code{\link{plot_pca}}
 #'
 #' @export
 visualize_normalization <- function(data_list,
                                     stages = names(data_list),
-                                    plots = c("density", "qq"),
+                                    plots = c("efficiency", "density"),
                                     sample_size = 100000,
                                     output_file = NULL,
                                     output_dir = NULL,
@@ -57,7 +58,7 @@ visualize_normalization <- function(data_list,
     stop("'data_list' must be a non-empty list of methylation data.")
   }
   
-  valid_plot_types <- c("density", "qq", "ma", "pca")
+  valid_plot_types <- c("efficiency", "density", "ma", "pca")
   invalid <- setdiff(plots, valid_plot_types)
   if (length(invalid) > 0) {
     stop("Invalid plot type(s): ", paste(invalid, collapse = ", "),
@@ -77,10 +78,12 @@ visualize_normalization <- function(data_list,
   }
   
   # --- Output directory ---
-  if (is.null(output_dir)) {
-    output_dir <- if (!is.null(output_file)) dirname(output_file) else getwd()
+  # Files are written only where the caller asked for them. This used to
+  # write a PDF per plot into the working directory when neither was given.
+  if (is.null(output_dir) && !is.null(output_file)) {
+    output_dir <- dirname(output_file)
   }
-  if (!dir.exists(output_dir)) {
+  if (!is.null(output_dir) && !dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
     message("Created output directory: ", output_dir)
   }
@@ -93,8 +96,8 @@ visualize_normalization <- function(data_list,
     p <- tryCatch({
       switch(
         plot_type,
+        efficiency = plot_efficiency(data_list, stages, theme = theme),
         density = plot_density(data_list, stages, sample_size, theme),
-        qq      = plot_qq(data_list, stages, sample_size, theme = theme),
         ma      = plot_ma(data_list, stages, sample_size, theme = theme),
         pca     = plot_pca(data_list, stages, theme = theme)
       )
@@ -105,8 +108,10 @@ visualize_normalization <- function(data_list,
     
     if (!is.null(p)) {
       plot_objects[[plot_type]] <- p
-      rf <- .save_plot_report(p, plot_type, output_dir, length(stages))
-      if (!is.null(rf)) report_files[[plot_type]] <- rf
+      if (!is.null(output_dir)) {
+        rf <- .save_plot_report(p, plot_type, output_dir, length(stages))
+        if (!is.null(rf)) report_files[[plot_type]] <- rf
+      }
     }
   }
   

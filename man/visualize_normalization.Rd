@@ -7,7 +7,7 @@
 visualize_normalization(
   data_list,
   stages = names(data_list),
-  plots = c("density", "qq"),
+  plots = c("efficiency", "density"),
   sample_size = 1e+05,
   output_file = NULL,
   output_dir = NULL,
@@ -23,18 +23,19 @@ at a different normalization stage (e.g.,
 \code{data_list} elements. Default uses \code{names(data_list)}.}
 
 \item{plots}{Character vector of plot types to include. Options are
-\code{"density"}, \code{"qq"}, \code{"ma"}, and \code{"pca"}.
-Default is \code{c("density", "qq")}.}
+\code{"efficiency"}, \code{"density"}, \code{"ma"}, and \code{"pca"}.
+Default is \code{c("efficiency", "density")}.}
 
-\item{sample_size}{Number of sites to randomly sample for visualization.
-Default is 100000. Use \code{NULL} for all sites.}
+\item{sample_size}{Number of sites to randomly sample for the density and
+MA plots. Default is 100000. Use \code{NULL} for all sites. The
+efficiency curve always uses all sites.}
 
 \item{output_file}{File path to save the combined PDF report.
 If \code{NULL}, no file is saved.}
 
-\item{output_dir}{Directory for individual plot reports.
-Defaults to the directory of \code{output_file}, or the working
-directory if \code{output_file} is also \code{NULL}.}
+\item{output_dir}{Directory for individual plot reports (one PDF per
+plot). Defaults to the directory of \code{output_file}. If both are
+\code{NULL}, no files are written and the plots are only returned.}
 
 \item{theme}{ggplot2 theme to apply. Default is
 \code{\link[ggplot2]{theme_minimal}}.}
@@ -48,8 +49,8 @@ A list containing:
 \description{
 Generates a multi-page PDF report comparing methylation data across
 normalization stages. This is a convenience wrapper around the
-individual plot functions (\code{\link{plot_density}},
-\code{\link{plot_qq}}, \code{\link{plot_ma}}, \code{\link{plot_pca}}).
+individual plot functions (\code{\link{plot_efficiency}},
+\code{\link{plot_density}}, \code{\link{plot_ma}}, \code{\link{plot_pca}}).
 }
 \examples{
 \dontrun{
@@ -58,13 +59,13 @@ report <- visualize_normalization(
     "Before" = split_data,
     "After"  = normalized_data
   ),
-  plots = c("density", "ma", "pca"),
+  plots = c("efficiency", "density", "pca"),
   output_file = "normalization_report.pdf"
 )
 }
 
 }
 \seealso{
-\code{\link{plot_density}}, \code{\link{plot_qq}},
+\code{\link{plot_efficiency}}, \code{\link{plot_density}},
 \code{\link{plot_ma}}, \code{\link{plot_pca}}
 }

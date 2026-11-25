@@ -23,7 +23,6 @@ Imports:
     progress,
     purrr,
     Rcpp,
-    reshape2,
     rtracklayer,
     S4Vectors,
     stats,

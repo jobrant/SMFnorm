@@ -5,6 +5,6 @@
 \title{Visualization Functions for Methylation Data}
 \description{
 Functions for visualizing methylation data at various stages of the
-normalization workflow. Includes density plots, QQ plots, MA plots,
-and PCA/MDS plots.
+normalization workflow. Includes density plots, MA plots and PCA/MDS
+plots. See \code{\link{plot_efficiency}} for the efficiency curve.
 }
