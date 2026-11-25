@@ -42,8 +42,7 @@ test_that("mc values are non-negative after normalization", {
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
-    diagnostics = FALSE
-  )
+    diagnostics = FALSE, rate_between_groups = TRUE)
 
   for (g in names(normalized)) {
     for (r in names(normalized[[g]])) {
@@ -64,8 +63,7 @@ test_that("cov values are positive after normalization", {
     split_data,
     normalize_rates = FALSE,
     min_coverage = 1,
-    diagnostics = FALSE
-  )
+    diagnostics = FALSE, rate_between_groups = TRUE)
 
   for (g in names(normalized)) {
     for (r in names(normalized[[g]])) {
@@ -133,8 +131,7 @@ test_that("normalization handles sites with rate = 0", {
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
-    diagnostics = FALSE
-  )
+    diagnostics = FALSE, rate_between_groups = TRUE)
 
   # Rates should still be non-negative
   for (g in names(normalized)) {
@@ -164,8 +161,7 @@ test_that("normalization handles sites with rate = 1", {
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
-    diagnostics = FALSE
-  )
+    diagnostics = FALSE, rate_between_groups = TRUE)
 
   # Rates should not exceed 1
   for (g in names(normalized)) {
@@ -188,8 +184,7 @@ test_that("normalization handles two samples per group", {
       normalize_rates = TRUE,
       within_alpha = 0.3,
       min_coverage = 1,
-      diagnostics = FALSE
-    )
+      diagnostics = FALSE, rate_between_groups = TRUE)
   })
 })
 
@@ -207,8 +202,7 @@ test_that("normalization preserves number of samples and groups", {
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
-    diagnostics = FALSE
-  )
+    diagnostics = FALSE, rate_between_groups = TRUE)
 
   expect_equal(length(normalized), 3)
   expect_equal(names(normalized), c("X", "Y", "Z"))
@@ -233,8 +227,7 @@ test_that("normalization preserves genomic coordinate columns", {
     normalize_rates = TRUE,
     within_alpha = 0.3,
     min_coverage = 1,
-    diagnostics = FALSE
-  )
+    diagnostics = FALSE, rate_between_groups = TRUE)
 
   # chr, pos, strand should be unchanged
   expect_equal(normalized[[1]][[1]]$chr, orig_chr)

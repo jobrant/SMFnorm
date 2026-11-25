@@ -8,7 +8,7 @@ normalize_methylation_rates(
   data_list,
   group_names = NULL,
   within_groups = TRUE,
-  between_groups = TRUE,
+  between_groups,
   within_alpha = 1,
   between_alpha = 1,
   sites_per_quantile = 1000,
@@ -27,7 +27,10 @@ that is not in \code{data_list} is an error.}
 
 \item{within_groups}{Logical indicating whether to normalize within groups (default = TRUE)}
 
-\item{between_groups}{Logical indicating whether to normalize between groups (default = TRUE)}
+\item{between_groups}{Logical indicating whether to normalize between
+groups. There is no default: with two or more groups it must be given. See the section "Choosing
+\code{rate_between_groups}" in \code{\link{normalize_methylation_data}}.
+Ignored for a single group.}
 
 \item{within_alpha}{Numeric between 0 and 1. Shrinkage of site-level
 deviations in the within-group step (default = 1, no shrinkage). It does

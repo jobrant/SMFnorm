@@ -50,3 +50,34 @@
   }
   data_list
 }
+
+
+#' The between-group step must be chosen, not defaulted
+#'
+#' @param value The argument as given, or NULL when it was missing.
+#' @param arg Its name, for the message.
+#' @param n_groups Number of groups being normalized.
+#' @return TRUE or FALSE. A single group has nothing to normalize between, so
+#'   the step is off whatever was given.
+#' @keywords internal
+#' @noRd
+.require_between_choice <- function(value, arg, n_groups) {
+  if (n_groups < 2L) return(FALSE)
+  if (is.null(value)) {
+    stop("'", arg, "' must be set to TRUE or FALSE; it has no default.\n",
+         "  TRUE  brings all groups to a common level in every rate bin. ",
+         "This removes a\n        labeling-efficiency difference between ",
+         "groups, and equally a genuine broad\n        biological difference. ",
+         "Local differences (footprints, DMRs) are kept.\n",
+         "  FALSE keeps every difference between groups. A technical ",
+         "difference between\n        groups then gives more false positives ",
+         "than unnormalized data.\n",
+         "See ?normalize_methylation_data, and plot_efficiency(data, ",
+         "reference = \"all\") to look at\nthe difference between your groups.",
+         call. = FALSE)
+  }
+  if (!is.logical(value) || length(value) != 1L || is.na(value)) {
+    stop("'", arg, "' must be TRUE or FALSE.", call. = FALSE)
+  }
+  value
+}

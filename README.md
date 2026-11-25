@@ -71,8 +71,8 @@ single_data <- load_single_file(
 - Quantile-bin normalization of labeling-efficiency differences
 - Two steps:
   - Within-group: replicates of each group are normalized to one another
-  - Between-group (optional): all samples are normalized together, removing
-    global efficiency differences between conditions
+  - Between-group (a choice; see below): all samples are normalized together,
+    removing global differences between conditions
 - Sites are binned by mean rate (dynamic number of equal-count bins). Within a
   bin, sample *s*'s rate at site *i* becomes
 
@@ -90,10 +90,15 @@ single_data <- load_single_file(
 - Within a bin the deviations are mostly sampling noise, so α < 1 shrinks noise
   and makes downstream tests overconfident (more false positives). Keep α = 1
   for differential analysis.
-- The between-group step cannot tell a global efficiency difference from a
-  genuine genome-wide biological difference and removes both. Turn it off
-  (`rate_between_groups = FALSE`) when conditions are expected to differ
-  genome-wide.
+- `rate_between_groups` has no default and must be chosen. The between-group
+  step cannot tell a global efficiency difference from a genuine broad
+  biological difference: `TRUE` removes both (local differences such as DMRs
+  are kept). `FALSE` keeps both, and a technical difference between groups
+  then gives more false positives than unnormalized data, because the
+  replicates have been made to agree. Use `TRUE` when a difference in group
+  levels is more likely technical, `FALSE` when a broad biological difference
+  is expected. `plot_efficiency(data, reference = "all")` shows the difference
+  between groups.
 
 ### Visualization and Diagnostics
 

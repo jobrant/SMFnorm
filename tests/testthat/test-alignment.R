@@ -8,10 +8,9 @@
 #   - each sample comes back under its own name, holding its own data;
 #   - the sample_metadata attribute survives normalization.
 
-.norm <- function(d, ...) {
+.norm <- function(d, ..., rate_between_groups = TRUE) {
   suppressMessages(normalize_methylation_data(
-    d, diagnostics = FALSE, ...
-  ))
+    d, diagnostics = FALSE, ..., rate_between_groups = rate_between_groups))
 }
 
 .all_samples <- function(d) unlist(unname(d), recursive = FALSE)
@@ -50,7 +49,7 @@ test_that("the rate step on its own also rejects misaligned samples", {
   d$GroupA$GroupA_Rep2 <- d$GroupA$GroupA_Rep2[rev(seq_len(.N))]
 
   expect_error(
-    suppressMessages(normalize_methylation_rates(d, diagnostics = FALSE)),
+    suppressMessages(normalize_methylation_rates(d, diagnostics = FALSE, between_groups = TRUE)),
     "same sites in the same order"
   )
 })
@@ -159,9 +158,9 @@ test_that("the sample_metadata attribute survives both normalization entry point
   expect_false(is.null(meta))
 
   full <- suppressMessages(normalize_methylation_data(d, min_coverage = 12,
-                                                      diagnostics = FALSE))
+                                                      diagnostics = FALSE, rate_between_groups = TRUE))
   expect_identical(attr(full, "sample_metadata"), meta)
 
-  rates_only <- suppressMessages(normalize_methylation_rates(d, diagnostics = FALSE))
+  rates_only <- suppressMessages(normalize_methylation_rates(d, diagnostics = FALSE, between_groups = TRUE))
   expect_identical(attr(rates_only, "sample_metadata"), meta)
 })

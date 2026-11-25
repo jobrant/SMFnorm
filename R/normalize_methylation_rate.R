@@ -10,7 +10,10 @@
 #'   If NULL (default), all groups in \code{data_list} are used. Naming a group
 #'   that is not in \code{data_list} is an error.
 #' @param within_groups Logical indicating whether to normalize within groups (default = TRUE)
-#' @param between_groups Logical indicating whether to normalize between groups (default = TRUE)
+#' @param between_groups Logical indicating whether to normalize between
+#'   groups. There is no default: with two or more groups it must be given. See the section "Choosing
+#'   \code{rate_between_groups}" in \code{\link{normalize_methylation_data}}.
+#'   Ignored for a single group.
 #' @param within_alpha Numeric between 0 and 1. Shrinkage of site-level
 #'   deviations in the within-group step (default = 1, no shrinkage). It does
 #'   not control how much efficiency correction is applied; see Details.
@@ -81,7 +84,7 @@
 normalize_methylation_rates <- function(data_list,
                                         group_names = NULL,
                                         within_groups = TRUE,
-                                        between_groups = TRUE,
+                                        between_groups,
                                         within_alpha = 1,
                                         between_alpha = 1,
                                         sites_per_quantile = 1000,
@@ -91,6 +94,9 @@ normalize_methylation_rates <- function(data_list,
   # Input validation, and the groups to work on. `group_names` used to be
   # read here and then not used.
   data_list <- .select_groups(data_list, group_names, diagnostics)
+  between_groups <- .require_between_choice(
+    if (missing(between_groups)) NULL else between_groups,
+    "between_groups", length(data_list))
 
   result <- data_list
 

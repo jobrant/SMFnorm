@@ -398,7 +398,7 @@ test_that("normalize_methylation_data leaves coverage as observed integer depth"
   d <- make_test_split_data(n_reps_per_group = 2, n_sites = 500, seed = 5)
 
   out <- suppressMessages(normalize_methylation_data(d, min_coverage = 0,
-                                                     diagnostics = FALSE))
+                                                     diagnostics = FALSE, rate_between_groups = TRUE))
 
   for (g in names(d)) {
     for (s in names(d[[g]])) {

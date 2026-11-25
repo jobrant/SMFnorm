@@ -9,7 +9,7 @@ normalize_methylation_data(
   group_names = NULL,
   normalize_rates = TRUE,
   rate_within_groups = TRUE,
-  rate_between_groups = TRUE,
+  rate_between_groups,
   within_alpha = 1,
   between_alpha = 1,
   min_coverage = 5,
@@ -31,7 +31,10 @@ that is not in \code{data_list} is an error.}
 
 \item{rate_within_groups}{Logical, normalize rates within groups}
 
-\item{rate_between_groups}{Logical, normalize rates between groups}
+\item{rate_between_groups}{Logical, normalize rates between groups. There
+is no default: with two or more groups it must be given, because neither
+setting is safe to apply without thought. See "Choosing
+\code{rate_between_groups}" below. Ignored for a single group.}
 
 \item{within_alpha}{Shrinkage of site-level deviations in the within-group
 rate step (default = 1, no shrinkage). The efficiency correction itself is
@@ -78,23 +81,51 @@ formula and what each step removes.
 All samples must contain the same sites in the same row order, as returned by
 \code{\link{find_shared_sites}}; the function stops if they do not.
 }
+\section{Choosing \code{rate_between_groups}}{
+
+The within-group step makes the replicates of each group agree. The
+between-group step then brings all groups to a common level in every rate
+bin. Whether to run it depends on why the groups differ, which the data
+alone do not show:
+\itemize{
+\item \code{TRUE} removes a difference in labeling efficiency between the
+groups. It equally removes a genuine biological difference that is
+broad (shared by a large part of the genome), and pushes the opposite
+shift onto the remaining sites. Local differences such as individual
+footprints or differentially accessible regions are kept.
+\item \code{FALSE} keeps every difference between the groups, technical
+or biological. Because the replicates have been made to agree, a
+technical difference between the groups is then tested against less
+noise and gives more false positives than the unnormalized data would.
+}
+Use \code{TRUE} when the groups are expected to have similar overall
+accessibility and a difference in their levels is more likely technical
+(different batches, enzyme lots or labeling times). Use \code{FALSE} when
+a broad biological difference is expected, and then treat a difference in
+group levels with care. \code{plot_efficiency(data, reference = "all")}
+shows the difference between the groups before the choice is made.
+}
+
 \examples{
 \dontrun{
-# Basic usage with defaults
-normalized_data <- normalize_methylation_data(data_list = split_data)
+# Replicates made to agree within each group; group levels left as they are
+normalized_data <- normalize_methylation_data(
+  data_list = split_data,
+  rate_between_groups = FALSE
+)
 
 # Two of the groups only
 normalized_data <- normalize_methylation_data(
   data_list = split_data,
-  group_names = c("Control", "Treated")
+  group_names = c("Control", "Treated"),
+  rate_between_groups = FALSE
 )
 
-# Correct efficiency within groups only, e.g. when the conditions are
-# expected to differ genome-wide and the between-group step would remove
-# that difference along with any efficiency difference
+# Also bring the groups to a common level, when a difference between them
+# is expected to be technical
 normalized_data <- normalize_methylation_data(
   data_list = split_data,
-  rate_between_groups = FALSE
+  rate_between_groups = TRUE
 )
 }
 

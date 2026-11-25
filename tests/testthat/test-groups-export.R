@@ -85,19 +85,19 @@ test_that("create_RSE rejects an unknown group and does not modify its input", {
 test_that("group_names restricts normalization to the named groups", {
     lol <- .lol(groups = c("A", "B", "C"), n_sites = 400)
     two <- suppressMessages(normalize_methylation_data(
-        lol, group_names = c("C", "A"), min_coverage = 0))
+        lol, group_names = c("C", "A"), min_coverage = 0, rate_between_groups = TRUE))
 
     expect_named(two, c("C", "A"))
     expect_setequal(attr(two, "sample_metadata")$group_id, c("A", "C"))
 
     # The same as normalizing a list that holds only those groups.
     ref <- suppressMessages(normalize_methylation_data(lol[c("C", "A")],
-                                                       min_coverage = 0))
+                                                       min_coverage = 0, rate_between_groups = TRUE))
     for (g in names(two)) for (s in names(two[[g]])) {
         expect_equal(two[[g]][[s]]$rate, ref[[g]][[s]]$rate)
     }
     # And not the same as normalizing all three groups together.
-    all3 <- suppressMessages(normalize_methylation_data(lol, min_coverage = 0))
+    all3 <- suppressMessages(normalize_methylation_data(lol, min_coverage = 0, rate_between_groups = TRUE))
     expect_false(isTRUE(all.equal(all3$A[[1]]$rate, two$A[[1]]$rate)))
 })
 
@@ -110,28 +110,28 @@ test_that("group_names is honoured by normalize_methylation_rates too", {
 
 test_that("unknown or malformed group_names is an error", {
     lol <- .lol(groups = c("A", "B"))
-    expect_error(normalize_methylation_data(lol, group_names = c("A", "Z")),
+    expect_error(normalize_methylation_data(lol, group_names = c("A", "Z"), rate_between_groups = TRUE),
                  "not found in data_list: Z")
     expect_error(normalize_methylation_rates(lol, group_names = 1:2,
-                                             diagnostics = FALSE),
+                                             diagnostics = FALSE, between_groups = TRUE),
                  "character vector")
-    expect_error(normalize_methylation_data(lol, group_names = c("A", "A")),
+    expect_error(normalize_methylation_data(lol, group_names = c("A", "A"), rate_between_groups = TRUE),
                  "distinct")
 })
 
 test_that("a flat list of samples is rejected with a pointer to split_by_groups", {
     flat <- unlist(unname(.lol(groups = c("A", "B"))), recursive = FALSE)
-    expect_error(normalize_methylation_data(flat), "split_by_groups")
+    expect_error(normalize_methylation_data(flat, rate_between_groups = TRUE), "split_by_groups")
 })
 
 test_that("normalization diagnostics are messages, with nothing on stdout", {
     lol <- .lol(groups = c("A", "B"), n_sites = 400)
     out <- capture.output(
         res <- suppressMessages(normalize_methylation_data(lol, min_coverage = 0,
-                                                           diagnostics = TRUE)))
+                                                           diagnostics = TRUE, rate_between_groups = TRUE)))
     expect_length(out, 0L)
     expect_message(normalize_methylation_data(lol, min_coverage = 0,
-                                              diagnostics = TRUE),
+                                              diagnostics = TRUE, rate_between_groups = TRUE),
                    "within-group")
 })
 
@@ -241,4 +241,41 @@ test_that("the leftover C++ test function is gone", {
     expect_false(exists("testCpp", envir = asNamespace("SMFnorm"), inherits = FALSE))
     expect_false(exists("extract_group_names", envir = asNamespace("SMFnorm"),
                         inherits = FALSE))
+})
+
+
+# --- the between-group step has no default --------------------------------
+
+test_that("the between-group choice must be made when there are several groups", {
+    lol <- .lol(groups = c("A", "B"), n_sites = 400)
+    expect_error(normalize_methylation_data(lol, min_coverage = 0),
+                 "'rate_between_groups' must be set to TRUE or FALSE")
+    expect_error(normalize_methylation_rates(lol, diagnostics = FALSE),
+                 "'between_groups' must be set to TRUE or FALSE")
+    expect_error(normalize_methylation_data(lol, rate_between_groups = NA),
+                 "must be TRUE or FALSE")
+    expect_error(normalize_methylation_data(lol, rate_between_groups = "yes"),
+                 "must be TRUE or FALSE")
+})
+
+test_that("the choice is not asked for when it cannot matter", {
+    lol <- .lol(groups = c("A", "B"), n_sites = 400)
+    # One group
+    one <- suppressMessages(normalize_methylation_data(lol, group_names = "A",
+                                                       min_coverage = 0))
+    expect_named(one, "A")
+    expect_no_error(suppressMessages(
+        normalize_methylation_rates(lol["B"], diagnostics = FALSE)))
+    # No rate normalization at all
+    expect_no_error(normalize_methylation_data(lol, normalize_rates = FALSE,
+                                               min_coverage = 0))
+})
+
+test_that("TRUE and FALSE give the two different normalizations", {
+    lol <- .lol(groups = c("A", "B"), n_sites = 400)
+    both <- suppressMessages(normalize_methylation_data(
+        lol, min_coverage = 0, rate_between_groups = TRUE))
+    within <- suppressWarnings(suppressMessages(normalize_methylation_data(
+        lol, min_coverage = 0, rate_between_groups = FALSE)))
+    expect_false(isTRUE(all.equal(both$A[[1]]$rate, within$A[[1]]$rate)))
 })

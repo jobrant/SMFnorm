@@ -167,8 +167,7 @@ test_that("min_coverage filter removes low-coverage sites", {
     split_data,
     normalize_rates = FALSE,
     min_coverage = 5,
-    diagnostics = FALSE
-  )
+    diagnostics = FALSE, rate_between_groups = TRUE)
 
   # Should have fewer sites after filtering
   for (g in names(normalized)) {
