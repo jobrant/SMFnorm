@@ -15,11 +15,16 @@ normalize_methylation_data(
   min_coverage = 5,
   max_quantiles = 50,
   sites_per_quantile = 1000,
-  diagnostics = FALSE
+  diagnostics = FALSE,
+  group_col = "group"
 )
 }
 \arguments{
-\item{data_list}{List of methylation data by group}
+\item{data_list}{Methylation data: a list of groups, each a list of samples
+(as returned by \code{\link{split_by_groups}}); a
+\code{RangedSummarizedExperiment} with assays \code{coverage} and
+\code{rate} (as made by \code{\link{create_RSE}}); or a \code{BSseq}
+object. See "Objects" below.}
 
 \item{group_names}{Optional character vector naming the groups to
 normalize. Only these groups are used and returned, in the order given;
@@ -53,11 +58,15 @@ the same sites. Use 0 to skip the filter.}
 \item{sites_per_quantile}{Target number of sites per quantile for rate normalization}
 
 \item{diagnostics}{Logical, whether to output diagnostic information}
+
+\item{group_col}{For an object: the name of the \code{colData} column that
+gives each sample's group. Default \code{"group"}.}
 }
 \value{
-Normalized methylation data list with the same group and sample names
+For a list: the normalized list with the same group and sample names
 as the input (or the groups in \code{group_names}), and its
-\code{sample_metadata} attribute if it had one.
+\code{sample_metadata} attribute if it had one. For an object: an object
+of the same class; see "Objects".
 }
 \description{
 Filters sites by coverage and normalizes methylation rates.
@@ -104,6 +113,27 @@ accessibility and a difference in their levels is more likely technical
 a broad biological difference is expected, and then treat a difference in
 group levels with care. \code{plot_efficiency(data, reference = "all")}
 shows the difference between the groups before the choice is made.
+}
+
+\section{Objects}{
+
+A \code{RangedSummarizedExperiment} or \code{BSseq} object is normalized by
+the same code as a list and returned as the same class, restricted to the
+sites that pass the coverage filter (and to the groups in
+\code{group_names}, if given). Rows keep their order.
+\itemize{
+\item \code{RangedSummarizedExperiment}: the \code{rate} assay holds the
+normalized rates; \code{coverage} is unchanged.
+\item \code{BSseq}: the \code{M} assay holds methylated counts consistent
+with the normalized rates, \code{round(Cov * rate)}; \code{Cov} is
+unchanged. Smoothed values, if present, are left as they were and
+should be recomputed.
+}
+Sites with a missing value in any sample are dropped. A site with no reads
+in a sample has rate 0 there; set \code{min_coverage} to at least 1 to
+leave such sites out. The settings used are recorded in
+\code{metadata(x)$SMFnorm}. On-disk (HDF5-backed) assays are read into
+memory, and the result is held in memory.
 }
 
 \examples{

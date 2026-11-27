@@ -30,6 +30,7 @@ Imports:
     SummarizedExperiment,
     utils
 Suggests:
+    bsseq,
     cowplot,
     testthat (>= 3.0.0),
     tools

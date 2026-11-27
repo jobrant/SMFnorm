@@ -4,7 +4,11 @@
 #' non-linear enzyme efficiency differences.
 #'
 #' @param data_list List of methylation data by group, with the same sites in
-#'   the same row order in every sample
+#'   the same row order in every sample; or a \code{RangedSummarizedExperiment}
+#'   or \code{BSseq} object (see "Objects" in
+#'   \code{\link{normalize_methylation_data}})
+#' @param group_col For an object: the name of the \code{colData} column that
+#'   gives each sample's group. Default \code{"group"}.
 #' @param group_names Optional character vector naming the groups to
 #'   normalize. Only these groups are used and returned, in the order given.
 #'   If NULL (default), all groups in \code{data_list} are used. Naming a group
@@ -78,7 +82,8 @@
 #'   average.
 #'
 #' @return List of lists containing normalized methylation data, with the
-#'   group and sample names of the input (or the groups in \code{group_names})
+#'   group and sample names of the input (or the groups in \code{group_names});
+#'   or, for an object, an object of the same class
 #'
 #' @export
 normalize_methylation_rates <- function(data_list,
@@ -89,7 +94,24 @@ normalize_methylation_rates <- function(data_list,
                                         between_alpha = 1,
                                         sites_per_quantile = 1000,
                                         max_quantiles = 50,
-                                        diagnostics = TRUE) {
+                                        diagnostics = TRUE,
+                                        group_col = "group") {
+
+  # A SummarizedExperiment-type object: convert, normalize as a list, write back
+  if (.is_se(data_list)) {
+    args <- list(within_groups = within_groups,
+                 within_alpha = within_alpha, between_alpha = between_alpha,
+                 sites_per_quantile = sites_per_quantile,
+                 max_quantiles = max_quantiles)
+    if (!missing(between_groups)) args$between_groups <- between_groups
+    return(.normalize_se(
+      data_list, group_col, group_names, min_coverage = NULL,
+      normalize = function(lst) {
+        do.call(normalize_methylation_rates,
+                c(list(data_list = lst, diagnostics = diagnostics), args))
+      },
+      settings = args))
+  }
 
   # Input validation, and the groups to work on. `group_names` used to be
   # read here and then not used.

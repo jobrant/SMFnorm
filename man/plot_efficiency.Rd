@@ -20,6 +20,9 @@ plot_efficiency(
 data.table), as returned by \code{\link{split_by_groups}} or the
 normalization functions, or a named list of such objects to compare
 stages, e.g. \code{list(Before = split_data, After = normalized_data)}.
+A \code{RangedSummarizedExperiment} or \code{BSseq} object is accepted
+wherever a nested list is; its samples are grouped by the \code{colData}
+column \code{group}.
 Within a stage, all samples must hold the same sites in the same order.}
 
 \item{stages}{Optional character vector of stage names. Defaults to the

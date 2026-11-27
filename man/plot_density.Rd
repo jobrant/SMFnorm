@@ -15,7 +15,9 @@ plot_density(
 \item{meth_data}{A nested list of methylation data (group -> sample ->
 data.table), as returned by \code{\link{split_by_groups}} or the
 normalization functions. Can also be a named list of such objects
-for multi-stage comparison.}
+for multi-stage comparison. A \code{RangedSummarizedExperiment} or
+\code{BSseq} object is accepted wherever a nested list is; its samples
+are grouped by the \code{colData} column \code{group}.}
 
 \item{stages}{Optional character vector of stage names. Required when
 \code{meth_data} is a list of normalization stages. Ignored for

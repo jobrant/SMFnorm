@@ -25,7 +25,9 @@ utils::globalVariables(c(
 #' @param meth_data A nested list of methylation data (group -> sample ->
 #'   data.table), as returned by \code{\link{split_by_groups}} or the
 #'   normalization functions. Can also be a named list of such objects
-#'   for multi-stage comparison.
+#'   for multi-stage comparison. A \code{RangedSummarizedExperiment} or
+#'   \code{BSseq} object is accepted wherever a nested list is; its samples
+#'   are grouped by the \code{colData} column \code{group}.
 #' @param stages Optional character vector of stage names. Required when
 #'   \code{meth_data} is a list of normalization stages. Ignored for
 #'   single-stage data.
@@ -339,6 +341,18 @@ plot_pca <- function(meth_data,
 #' @keywords internal
 #' @noRd
 .detect_stages <- function(meth_data, stages = NULL) {
+  # SummarizedExperiment-type objects (one, or one per stage) become lists,
+  # grouped by their colData column "group"
+  if (.is_se(meth_data)) {
+    meth_data <- .se_as_group_list(meth_data)
+  } else if (is.list(meth_data) && length(meth_data) &&
+             any(vapply(meth_data, .is_se, logical(1)))) {
+    nm <- names(meth_data)
+    meth_data <- lapply(meth_data, function(x) {
+      if (.is_se(x)) .se_as_group_list(x) else x
+    })
+    names(meth_data) <- nm
+  }
   # Check if the input is a list of stages (list of list of lists)
   # vs a single stage (list of lists of data.tables)
   if (.is_single_stage(meth_data)) {

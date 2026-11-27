@@ -2,7 +2,13 @@
 #'
 #' Filters sites by coverage and normalizes methylation rates.
 #'
-#' @param data_list List of methylation data by group
+#' @param data_list Methylation data: a list of groups, each a list of samples
+#'   (as returned by \code{\link{split_by_groups}}); a
+#'   \code{RangedSummarizedExperiment} with assays \code{coverage} and
+#'   \code{rate} (as made by \code{\link{create_RSE}}); or a \code{BSseq}
+#'   object. See "Objects" below.
+#' @param group_col For an object: the name of the \code{colData} column that
+#'   gives each sample's group. Default \code{"group"}.
 #' @param group_names Optional character vector naming the groups to
 #'   normalize. Only these groups are used and returned, in the order given;
 #'   the others play no part in the coverage filter or the between-group step.
@@ -70,9 +76,29 @@
 #' All samples must contain the same sites in the same row order, as returned by
 #' \code{\link{find_shared_sites}}; the function stops if they do not.
 #'
-#' @return Normalized methylation data list with the same group and sample names
+#' @return For a list: the normalized list with the same group and sample names
 #'   as the input (or the groups in \code{group_names}), and its
-#'   \code{sample_metadata} attribute if it had one.
+#'   \code{sample_metadata} attribute if it had one. For an object: an object
+#'   of the same class; see "Objects".
+#'
+#' @section Objects:
+#' A \code{RangedSummarizedExperiment} or \code{BSseq} object is normalized by
+#' the same code as a list and returned as the same class, restricted to the
+#' sites that pass the coverage filter (and to the groups in
+#' \code{group_names}, if given). Rows keep their order.
+#' \itemize{
+#'   \item \code{RangedSummarizedExperiment}: the \code{rate} assay holds the
+#'     normalized rates; \code{coverage} is unchanged.
+#'   \item \code{BSseq}: the \code{M} assay holds methylated counts consistent
+#'     with the normalized rates, \code{round(Cov * rate)}; \code{Cov} is
+#'     unchanged. Smoothed values, if present, are left as they were and
+#'     should be recomputed.
+#' }
+#' Sites with a missing value in any sample are dropped. A site with no reads
+#' in a sample has rate 0 there; set \code{min_coverage} to at least 1 to
+#' leave such sites out. The settings used are recorded in
+#' \code{metadata(x)$SMFnorm}. On-disk (HDF5-backed) assays are read into
+#' memory, and the result is held in memory.
 #'
 #' @examples
 #' \dontrun{
@@ -112,7 +138,28 @@ normalize_methylation_data <- function(data_list,
                                        min_coverage = 5,
                                        max_quantiles = 50,
                                        sites_per_quantile = 1000,
-                                       diagnostics = FALSE) {
+                                       diagnostics = FALSE,
+                                       group_col = "group") {
+
+  # A SummarizedExperiment-type object: convert, normalize as a list, write back
+  if (.is_se(data_list)) {
+    args <- list(normalize_rates = normalize_rates,
+                 rate_within_groups = rate_within_groups,
+                 within_alpha = within_alpha, between_alpha = between_alpha,
+                 max_quantiles = max_quantiles,
+                 sites_per_quantile = sites_per_quantile)
+    if (!missing(rate_between_groups)) {
+      args$rate_between_groups <- rate_between_groups
+    }
+    return(.normalize_se(
+      data_list, group_col, group_names, min_coverage,
+      normalize = function(lst) {
+        do.call(normalize_methylation_data,
+                c(list(data_list = lst, min_coverage = 0,
+                       diagnostics = diagnostics), args))
+      },
+      settings = c(args, list(min_coverage = min_coverage))))
+  }
 
   # Input validation, and the groups to work on. `group_names` used to be
   # overwritten here and had no effect.

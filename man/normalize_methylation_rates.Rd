@@ -13,12 +13,15 @@ normalize_methylation_rates(
   between_alpha = 1,
   sites_per_quantile = 1000,
   max_quantiles = 50,
-  diagnostics = TRUE
+  diagnostics = TRUE,
+  group_col = "group"
 )
 }
 \arguments{
 \item{data_list}{List of methylation data by group, with the same sites in
-the same row order in every sample}
+the same row order in every sample; or a \code{RangedSummarizedExperiment}
+or \code{BSseq} object (see "Objects" in
+\code{\link{normalize_methylation_data}})}
 
 \item{group_names}{Optional character vector naming the groups to
 normalize. Only these groups are used and returned, in the order given.
@@ -47,10 +50,14 @@ normalization granularity and statistical power.}
 \item{max_quantiles}{Maximum number of quantiles to use (default = 50)}
 
 \item{diagnostics}{Logical indicating whether to print diagnostic information}
+
+\item{group_col}{For an object: the name of the \code{colData} column that
+gives each sample's group. Default \code{"group"}.}
 }
 \value{
 List of lists containing normalized methylation data, with the
-group and sample names of the input (or the groups in \code{group_names})
+group and sample names of the input (or the groups in \code{group_names});
+or, for an object, an object of the same class
 }
 \description{
 Normalizes methylation rates using quantile-based normalization to account for
